@@ -15,6 +15,10 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { MeetingsModule } from './meetings/meetings.module';
 import { CalendarModule } from './calendar/calendar.module';
 import { IdeasModule } from './ideas/ideas.module';
+import { ChatModule } from './chat/chat.module';
+import { FilesModule } from './files/files.module';
+import { EvaluationsModule } from './evaluations/evaluations.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
   imports: [
@@ -35,6 +39,10 @@ import { IdeasModule } from './ideas/ideas.module';
     MeetingsModule,
     CalendarModule,
     IdeasModule,
+    ChatModule,
+    FilesModule,
+    EvaluationsModule,
+    AnalyticsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

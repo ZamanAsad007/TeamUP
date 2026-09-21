@@ -1,6 +1,13 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { MemberStatus, TaskStatus, Priority } from '@prisma/client';
+import { CreateTaskDto } from './dto/create-task.dto';
+import { UpdateTaskDto } from './dto/update-task.dto';
 
 @Injectable()
 export class WorkspaceService {
@@ -225,5 +232,194 @@ export class WorkspaceService {
       recentFiles,
       lastMessage,
     };
+  }
+
+  /**
+   * Verify user is a member of the project
+   */
+  private async verifyProjectMembership(
+    projectId: string,
+    userId: string,
+  ): Promise<void> {
+    const membership = await this.prisma.projectMember.findFirst({
+      where: {
+        projectId,
+        userId,
+        status: MemberStatus.ACCEPTED,
+      },
+    });
+
+    if (!membership) {
+      throw new ForbiddenException(
+        'You must be a project member to perform this action',
+      );
+    }
+  }
+
+  /**
+   * Get all tasks for a project (Kanban board data)
+   */
+  async getProjectTasks(projectId: string, userId: string) {
+    await this.verifyProjectMembership(projectId, userId);
+
+    const tasks = await this.prisma.task.findMany({
+      where: { projectId },
+      orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
+      include: {
+        assignee: {
+          select: {
+            id: true,
+            email: true,
+            profile: {
+              select: {
+                fullName: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return tasks;
+  }
+
+  /**
+   * Create a new task
+   */
+  async createTask(
+    projectId: string,
+    userId: string,
+    dto: CreateTaskDto,
+  ) {
+    await this.verifyProjectMembership(projectId, userId);
+
+    // Verify assignee is also a project member if provided
+    if (dto.assigneeId) {
+      const assigneeMembership = await this.prisma.projectMember.findFirst({
+        where: {
+          projectId,
+          userId: dto.assigneeId,
+          status: MemberStatus.ACCEPTED,
+        },
+      });
+
+      if (!assigneeMembership) {
+        throw new BadRequestException(
+          'Assignee must be a member of the project',
+        );
+      }
+    }
+
+    const task = await this.prisma.task.create({
+      data: {
+        projectId,
+        title: dto.title,
+        description: dto.description,
+        status: dto.status ?? TaskStatus.TODO,
+        priority: dto.priority ?? Priority.MEDIUM,
+        assigneeId: dto.assigneeId,
+        dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
+      },
+      include: {
+        assignee: {
+          select: {
+            id: true,
+            email: true,
+            profile: {
+              select: {
+                fullName: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return task;
+  }
+
+  /**
+   * Update a task
+   */
+  async updateTask(taskId: string, userId: string, dto: UpdateTaskDto) {
+    const task = await this.prisma.task.findUnique({
+      where: { id: taskId },
+      include: { project: true },
+    });
+
+    if (!task) {
+      throw new NotFoundException(`Task with ID '${taskId}' not found`);
+    }
+
+    await this.verifyProjectMembership(task.projectId, userId);
+
+    // Verify assignee is a project member if being updated
+    if (dto.assigneeId) {
+      const assigneeMembership = await this.prisma.projectMember.findFirst({
+        where: {
+          projectId: task.projectId,
+          userId: dto.assigneeId,
+          status: MemberStatus.ACCEPTED,
+        },
+      });
+
+      if (!assigneeMembership) {
+        throw new BadRequestException(
+          'Assignee must be a member of the project',
+        );
+      }
+    }
+
+    const updatedTask = await this.prisma.task.update({
+      where: { id: taskId },
+      data: {
+        title: dto.title,
+        description: dto.description,
+        status: dto.status,
+        priority: dto.priority,
+        assigneeId: dto.assigneeId,
+        dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
+      },
+      include: {
+        assignee: {
+          select: {
+            id: true,
+            email: true,
+            profile: {
+              select: {
+                fullName: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return updatedTask;
+  }
+
+  /**
+   * Delete a task
+   */
+  async deleteTask(taskId: string, userId: string) {
+    const task = await this.prisma.task.findUnique({
+      where: { id: taskId },
+      include: { project: true },
+    });
+
+    if (!task) {
+      throw new NotFoundException(`Task with ID '${taskId}' not found`);
+    }
+
+    await this.verifyProjectMembership(task.projectId, userId);
+
+    await this.prisma.task.delete({
+      where: { id: taskId },
+    });
+
+    return { message: 'Task deleted successfully' };
   }
 }
