@@ -25,12 +25,14 @@ import {
 
 export interface CalendarViewProps {
   projectId?: string;
+  onSelectEvent?: (event: CalendarEvent) => void;
+  onSelectDate?: (date: string) => void;
 }
 
 export const CalendarView: React.FC<CalendarViewProps> = ({
   projectId = 'project-1',
-  onSelectEvent,
-  onSelectDate,
+  onSelectEvent: _onSelectEvent,
+  onSelectDate: _onSelectDate,
 }) => {
   const { colors, typography, spacing, isDark } = useTheme();
 

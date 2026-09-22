@@ -10,7 +10,10 @@ import { SearchScreen } from '../screens/Search/SearchScreen';
 import { NotificationsScreen } from '../screens/Notifications/NotificationsScreen';
 import { SchedulerScreen } from '../screens/Scheduler/SchedulerScreen';
 
+import { MarketplaceScreen } from '../screens/Marketplace/MarketplaceScreen';
+
 export type MainTabParamList = {
+  Projects: undefined;
   Profile: undefined;
   Matching: undefined;
   IdeaHub: undefined;
@@ -39,6 +42,14 @@ export const TabNavigator = () => {
         tabBarInactiveTintColor: colors.onSurfaceVariant,
       }}
     >
+      <Tab.Screen
+        name="Projects"
+        component={MarketplaceScreen}
+        options={{
+          title: 'Projects',
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 18 }}>🚀</Text>,
+        }}
+      />
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}

@@ -77,6 +77,6 @@ export const api = {
     apiClient.put(url, data) as unknown as Promise<T>,
   patch: <T = any>(url: string, data?: any): Promise<T> =>
     apiClient.patch(url, data) as unknown as Promise<T>,
-  delete: <T = any>(url: string): Promise<T> =>
-    apiClient.delete(url) as unknown as Promise<T>,
+  delete: <T = any>(url: string, data?: any): Promise<T> =>
+    apiClient.delete(url, { data }) as unknown as Promise<T>,
 };

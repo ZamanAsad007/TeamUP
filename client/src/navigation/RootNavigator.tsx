@@ -7,6 +7,9 @@ import { LandingScreen } from '../screens/Landing/LandingScreen';
 import { LoginScreen } from '../screens/Auth/LoginScreen';
 import { RegisterScreen } from '../screens/Auth/RegisterScreen';
 import { TabNavigator } from './TabNavigator';
+import { WorkspaceNavigator } from './WorkspaceNavigator';
+import { ProjectDetailScreen } from '../screens/Marketplace/ProjectDetailScreen';
+import { CreateProjectScreen } from '../screens/Marketplace/CreateProjectScreen';
 import { StateWrapper } from '../components/StateWrapper';
 
 export type RootStackParamList = {
@@ -15,6 +18,9 @@ export type RootStackParamList = {
   Login: undefined;
   Register: undefined;
   MainApp: undefined;
+  ProjectDetail: { projectId: string };
+  CreateProject: undefined;
+  Workspace: { projectId: string; projectTitle?: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -49,7 +55,30 @@ export const RootNavigator = () => {
     <NavigationContainer theme={themeConfig}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {isAuthenticated ? (
-          <Stack.Screen name="MainApp" component={TabNavigator} />
+          <>
+            <Stack.Screen name="MainApp" component={TabNavigator} />
+            <Stack.Screen
+              name="ProjectDetail"
+              component={ProjectDetailScreen}
+              options={{
+                headerShown: true,
+                title: 'Project Details',
+                headerStyle: { backgroundColor: colors.surface },
+                headerTintColor: colors.onSurface,
+              }}
+            />
+            <Stack.Screen
+              name="CreateProject"
+              component={CreateProjectScreen}
+              options={{
+                headerShown: true,
+                title: 'Create Project',
+                headerStyle: { backgroundColor: colors.surface },
+                headerTintColor: colors.onSurface,
+              }}
+            />
+            <Stack.Screen name="Workspace" component={WorkspaceNavigator} />
+          </>
         ) : (
           <>
             <Stack.Screen name="Landing" component={LandingScreen} />
