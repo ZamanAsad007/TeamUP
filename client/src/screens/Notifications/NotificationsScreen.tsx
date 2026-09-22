@@ -188,6 +188,97 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
     }
   };
 
+  const isToday = (isoString: string) => {
+    if (!isoString) return true;
+    try {
+      const date = new Date(isoString);
+      const today = new Date();
+      return (
+        date.getDate() === today.getDate() &&
+        date.getMonth() === today.getMonth() &&
+        date.getFullYear() === today.getFullYear()
+      );
+    } catch {
+      return true;
+    }
+  };
+
+  const renderNotificationCard = (item: AppNotification) => {
+    const isUnread = !item.isRead;
+    return (
+      <Pressable
+        key={item.id}
+        testID={`notification-item-${item.id}`}
+        onPress={() => handleMarkAsRead(item)}
+        style={({ pressed }) => [
+          styles.cardWrapper,
+          { transform: [{ scale: pressed ? 0.98 : 1.0 }] },
+        ]}
+      >
+        <Card
+          style={[
+            styles.notificationCard,
+            isUnread && {
+              backgroundColor: colors.surfaceVariant,
+              borderColor: colors.primary,
+              borderWidth: 1.5,
+            },
+          ]}
+        >
+          <View style={styles.cardHeader}>
+            <View style={styles.typeIconRow}>
+              <Text style={{ fontSize: 20, marginRight: 8 }}>
+                {getTypeIcon(item.type)}
+              </Text>
+              <Text
+                style={[
+                  styles.notificationTitle,
+                  {
+                    color: colors.onSurface,
+                    fontWeight: isUnread ? '700' : '500',
+                  },
+                ]}
+              >
+                {item.title}
+              </Text>
+            </View>
+
+            <View style={styles.cardHeaderRight}>
+              {isUnread && <View style={[styles.unreadDot, { backgroundColor: colors.primary }]} />}
+              <TouchableOpacity
+                onPress={() => handleDeleteNotification(item.id)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Text style={{ color: colors.onSurfaceVariant, fontSize: 16 }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <Text
+            style={[
+              styles.bodyText,
+              { color: colors.onSurfaceVariant, marginTop: spacing.xs },
+            ]}
+          >
+            {item.body}
+          </Text>
+
+          <View style={styles.cardFooter}>
+            <Text style={{ color: colors.onSurfaceVariant, fontSize: 12 }}>
+              {formatRelativeTime(item.createdAt)}
+            </Text>
+            {item.data?.screen && (
+              <Badge label={`Tap to open ${item.data.screen}`} variant="secondary" />
+            )}
+          </View>
+        </Card>
+      </Pressable>
+    );
+  };
+
+  const todayList = filteredNotifications.filter((n) => isToday(n.createdAt));
+  const earlierList = filteredNotifications.filter((n) => !isToday(n.createdAt));
+
   if (isLoading) {
     return <StateWrapper state="loading" />;
   }
@@ -259,80 +350,32 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
         />
       ) : (
         <FlatList
-          data={filteredNotifications}
-          keyExtractor={(item) => item.id}
+          data={[{ key: 'content' }]}
+          keyExtractor={(item) => item.key}
           contentContainerStyle={{ paddingBottom: spacing.lg }}
-          renderItem={({ item }) => {
-            const isUnread = !item.isRead;
-            return (
-              <Pressable
-                testID={`notification-item-${item.id}`}
-                onPress={() => handleMarkAsRead(item)}
-                style={({ pressed }) => [
-                  styles.cardWrapper,
-                  { transform: [{ scale: pressed ? 0.98 : 1.0 }] },
-                ]}
-              >
-                <Card
-                  style={[
-                    styles.notificationCard,
-                    isUnread && {
-                      backgroundColor: colors.surfaceVariant,
-                      borderColor: colors.primary,
-                      borderWidth: 1.5,
-                    },
-                  ]}
-                >
-                  <View style={styles.cardHeader}>
-                    <View style={styles.typeIconRow}>
-                      <Text style={{ fontSize: 20, marginRight: 8 }}>
-                        {getTypeIcon(item.type)}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.notificationTitle,
-                          {
-                            color: colors.onSurface,
-                            fontWeight: isUnread ? '700' : '500',
-                          },
-                        ]}
-                      >
-                        {item.title}
-                      </Text>
-                    </View>
-
-                    <View style={styles.cardHeaderRight}>
-                      {isUnread && <View style={[styles.unreadDot, { backgroundColor: colors.primary }]} />}
-                      <TouchableOpacity
-                        onPress={() => handleDeleteNotification(item.id)}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                      >
-                        <Text style={{ color: colors.onSurfaceVariant, fontSize: 16 }}>✕</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-
-                  <Text
-                    style={[
-                      styles.bodyText,
-                      { color: colors.onSurfaceVariant, marginTop: spacing.xs },
-                    ]}
-                  >
-                    {item.body}
+          renderItem={() => (
+            <View>
+              {todayList.length > 0 && (
+                <View style={{ marginBottom: spacing.sm }}>
+                  <Text style={[styles.groupTitle, { color: colors.onSurfaceVariant }]}>
+                    Today
                   </Text>
+                  <View style={[styles.groupDivider, { backgroundColor: colors.outlineVariant }]} />
+                  {todayList.map((item) => renderNotificationCard(item))}
+                </View>
+              )}
 
-                  <View style={styles.cardFooter}>
-                    <Text style={{ color: colors.onSurfaceVariant, fontSize: 12 }}>
-                      {formatRelativeTime(item.createdAt)}
-                    </Text>
-                    {item.data?.screen && (
-                      <Badge label={`Tap to open ${item.data.screen}`} variant="secondary" />
-                    )}
-                  </View>
-                </Card>
-              </Pressable>
-            );
-          }}
+              {earlierList.length > 0 && (
+                <View style={{ marginTop: spacing.sm, marginBottom: spacing.sm }}>
+                  <Text style={[styles.groupTitle, { color: colors.onSurfaceVariant }]}>
+                    Earlier
+                  </Text>
+                  <View style={[styles.groupDivider, { backgroundColor: colors.outlineVariant }]} />
+                  {earlierList.map((item) => renderNotificationCard(item))}
+                </View>
+              )}
+            </View>
+          )}
         />
       )}
     </View>
@@ -406,5 +449,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: 10,
+  },
+  groupTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  groupDivider: {
+    height: 1,
+    marginBottom: 10,
   },
 });

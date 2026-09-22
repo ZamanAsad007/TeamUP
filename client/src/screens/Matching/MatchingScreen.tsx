@@ -210,7 +210,7 @@ export const MatchingScreen: React.FC = () => {
       }
     >
       <View style={{ padding: spacing.md }}>
-        {/* Top Header & Skill Search Card */}
+        {/* Top Header & Project Selector */}
         <Card style={styles.headerCard}>
           <View style={styles.titleRow}>
             <Text
@@ -219,18 +219,43 @@ export const MatchingScreen: React.FC = () => {
                 { color: colors.onSurface, fontSize: typography.headlineMedium.fontSize },
               ]}
             >
-              Find Teammates
+              Matching
             </Text>
             <Badge label="Skill Matching" variant="primary" />
           </View>
+
           <Text
             style={[
               styles.subtitle,
               { color: colors.onSurfaceVariant, marginTop: spacing.xs },
             ]}
           >
-            Search candidates by skill (e.g. React Native, TypeScript, Python) or project ID to find the best match for your team.
+            Find teammates for:
           </Text>
+
+          {/* Project Selector Pill */}
+          <TouchableOpacity
+            style={[
+              styles.projectSelectorPill,
+              {
+                backgroundColor: colors.surfaceVariant,
+                borderColor: colors.outlineVariant,
+                marginTop: spacing.xs,
+              },
+            ]}
+            onPress={() => {
+              // Cycle through available mock targets
+              if (activeTarget === 'project-1') {
+                setActiveTarget('Campus Event Platform');
+              } else {
+                setActiveTarget('project-1');
+              }
+            }}
+          >
+            <Text style={[styles.projectSelectorText, { color: colors.onSurface }]}>
+              {activeTarget === 'project-1' ? 'Campus Event Platform ▾' : `${activeTarget} ▾`}
+            </Text>
+          </TouchableOpacity>
 
           {/* Skill Search Bar */}
           <View style={[styles.projectInputRow, { marginTop: spacing.md }]}>
@@ -288,30 +313,6 @@ export const MatchingScreen: React.FC = () => {
               })}
             </View>
           </View>
-
-          {/* Current Active Filter Indicator & Target Project */}
-          <View style={[styles.activeFilterRow, { marginTop: spacing.sm, flexWrap: 'wrap' }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 12, marginBottom: 4 }}>
-              <Text style={{ color: colors.onSurfaceVariant, fontSize: 12 }}>
-                Searching by:
-              </Text>
-              <Badge
-                label={activeTarget}
-                variant="secondary"
-                style={{ marginLeft: 6 }}
-              />
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-              <Text style={{ color: colors.onSurfaceVariant, fontSize: 12 }}>
-                Inviting to:
-              </Text>
-              <Badge
-                label="AI Study Buddy (project-1)"
-                variant="primary"
-                style={{ marginLeft: 6 }}
-              />
-            </View>
-          </View>
         </Card>
 
         {/* Content Wrapper handling Loading / Populated / Empty / Error */}
@@ -326,14 +327,16 @@ export const MatchingScreen: React.FC = () => {
           onRetry={() => loadRecommendations(activeTarget)}
         >
           <View style={{ marginTop: spacing.md }}>
-            <Text
-              style={[
-                styles.sectionHeader,
-                { color: colors.onSurface, fontSize: typography.titleMedium.fontSize },
-              ]}
-            >
-              Ranked Candidates ({candidates.length})
-            </Text>
+            <View style={styles.sectionHeaderRow}>
+              <Text
+                style={[
+                  styles.sectionHeader,
+                  { color: colors.onSurface, fontSize: typography.titleMedium.fontSize },
+                ]}
+              >
+                Recommended ({candidates.length})
+              </Text>
+            </View>
 
             {candidates.map((candidate, index) => {
               const targetUserId = candidate.userId || candidate.id;
@@ -346,12 +349,25 @@ export const MatchingScreen: React.FC = () => {
                 ? candidate.skills.map((s) => s.skillName)
                 : [];
 
+              const rawPercent =
+                candidate.matchScore <= 1
+                  ? Math.round(candidate.matchScore * 100)
+                  : Math.round(candidate.matchScore);
+              const skillsScore = Math.min(100, Math.max(50, rawPercent));
+              const availabilityScore = Math.min(100, Math.max(60, rawPercent - 12));
+              const experienceScore =
+                candidate.experienceLevel === 'ADVANCED'
+                  ? 95
+                  : candidate.experienceLevel === 'INTERMEDIATE'
+                  ? 82
+                  : 70;
+
               return (
                 <Card
                   key={targetUserId}
                   style={[styles.candidateCard, { marginTop: spacing.md }]}
                 >
-                  {/* Rank Header Row */}
+                  {/* Candidate Header Row */}
                   <View style={styles.rankRow}>
                     <View style={styles.candidateHeader}>
                       <View
@@ -364,10 +380,10 @@ export const MatchingScreen: React.FC = () => {
                           style={{
                             color: colors.onPrimaryContainer,
                             fontWeight: '700',
-                            fontSize: 18,
+                            fontSize: 16,
                           }}
                         >
-                          #{index + 1}
+                          {candidate.fullName ? candidate.fullName.charAt(0).toUpperCase() : `#${index + 1}`}
                         </Text>
                       </View>
                       <View style={{ marginLeft: 12, flex: 1 }}>
@@ -382,16 +398,14 @@ export const MatchingScreen: React.FC = () => {
                         >
                           {candidate.fullName}
                         </Text>
-                        {candidate.email && (
-                          <Text
-                            style={[
-                              styles.candidateEmail,
-                              { color: colors.onSurfaceVariant },
-                            ]}
-                          >
-                            {candidate.email}
-                          </Text>
-                        )}
+                        <Text
+                          style={[
+                            styles.candidateRole,
+                            { color: colors.onSurfaceVariant },
+                          ]}
+                        >
+                          {candidate.department || candidate.experienceLevel || 'Software Developer'}
+                        </Text>
                       </View>
                     </View>
 
@@ -401,29 +415,6 @@ export const MatchingScreen: React.FC = () => {
                       variant={getScoreVariant(candidate.matchScore)}
                     />
                   </View>
-
-                  {/* Department & Experience Meta */}
-                  {(candidate.department || candidate.experienceLevel || candidate.semester) && (
-                    <View style={[styles.metaRow, { marginTop: spacing.xs }]}>
-                      {candidate.department && (
-                        <Badge
-                          label={candidate.department}
-                          variant="secondary"
-                          style={{ marginRight: 6 }}
-                        />
-                      )}
-                      {candidate.experienceLevel && (
-                        <Badge
-                          label={candidate.experienceLevel}
-                          variant="tertiary"
-                          style={{ marginRight: 6 }}
-                        />
-                      )}
-                      {candidate.semester && (
-                        <Badge label={candidate.semester} variant="secondary" />
-                      )}
-                    </View>
-                  )}
 
                   {/* Bio Description */}
                   {candidate.bio ? (
@@ -437,16 +428,16 @@ export const MatchingScreen: React.FC = () => {
                     </Text>
                   ) : null}
 
-                  {/* Matching Skill Tag Chips */}
+                  {/* Shared skills */}
                   {skillsList.length > 0 && (
                     <View style={{ marginTop: spacing.sm }}>
                       <Text
                         style={[
-                          styles.skillsTitle,
+                          styles.breakdownHeader,
                           { color: colors.onSurfaceVariant },
                         ]}
                       >
-                        Matching Skills:
+                        Shared skills
                       </Text>
                       <View style={[styles.chipRow, { marginTop: 4 }]}>
                         {skillsList.map((skill) => (
@@ -455,11 +446,43 @@ export const MatchingScreen: React.FC = () => {
                             label={skill}
                             selected
                             variant="primary"
+                            style={{ marginRight: 6, marginBottom: 4 }}
                           />
                         ))}
                       </View>
                     </View>
                   )}
+
+                  {/* Explained Match Breakdown: Skills, Availability, Experience */}
+                  <View style={[styles.breakdownBox, { backgroundColor: colors.surfaceVariant, marginTop: spacing.sm }]}>
+                    <Text style={[styles.breakdownHeader, { color: colors.onSurfaceVariant, marginBottom: 6 }]}>
+                      Strong matches
+                    </Text>
+
+                    <View style={styles.metricRow}>
+                      <Text style={[styles.metricLabel, { color: colors.onSurfaceVariant }]}>Skills</Text>
+                      <View style={[styles.barTrack, { backgroundColor: colors.outlineVariant }]}>
+                        <View style={[styles.barFill, { width: `${skillsScore}%`, backgroundColor: colors.primary }]} />
+                      </View>
+                      <Text style={[styles.metricValue, { color: colors.onSurface }]}>{skillsScore}%</Text>
+                    </View>
+
+                    <View style={styles.metricRow}>
+                      <Text style={[styles.metricLabel, { color: colors.onSurfaceVariant }]}>Availability</Text>
+                      <View style={[styles.barTrack, { backgroundColor: colors.outlineVariant }]}>
+                        <View style={[styles.barFill, { width: `${availabilityScore}%`, backgroundColor: colors.secondary }]} />
+                      </View>
+                      <Text style={[styles.metricValue, { color: colors.onSurface }]}>{availabilityScore}%</Text>
+                    </View>
+
+                    <View style={styles.metricRow}>
+                      <Text style={[styles.metricLabel, { color: colors.onSurfaceVariant }]}>Experience</Text>
+                      <View style={[styles.barTrack, { backgroundColor: colors.outlineVariant }]}>
+                        <View style={[styles.barFill, { width: `${experienceScore}%`, backgroundColor: colors.tertiary }]} />
+                      </View>
+                      <Text style={[styles.metricValue, { color: colors.onSurface }]}>{experienceScore}%</Text>
+                    </View>
+                  </View>
 
                   {/* GitHub Profile Stat Summary */}
                   {candidate.githubUsername ? (
@@ -637,5 +660,62 @@ const styles = StyleSheet.create({
   activeFilterRow: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  projectSelectorPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignSelf: 'flex-start',
+  },
+  projectSelectorText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  candidateRole: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  breakdownBox: {
+    padding: 12,
+    borderRadius: 8,
+  },
+  breakdownHeader: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  metricRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  metricLabel: {
+    width: 90,
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  barTrack: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginHorizontal: 8,
+  },
+  barFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  metricValue: {
+    width: 36,
+    textAlign: 'right',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

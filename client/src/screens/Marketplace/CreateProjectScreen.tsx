@@ -18,25 +18,39 @@ import { projectService } from '../../services/projectService';
 
 export interface CreateProjectScreenProps {
   navigation?: any;
+  route?: any;
 }
 
-export const CreateProjectScreen: React.FC<CreateProjectScreenProps> = ({ navigation }) => {
+export const CreateProjectScreen: React.FC<CreateProjectScreenProps> = ({ navigation, route }) => {
   const { colors, typography, spacing, borderRadius } = useTheme();
+  const prefill = route?.params?.prefill;
 
   // Current Step: 1 = Basics, 2 = Team & Skills, 3 = Review
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
 
   // Step 1: Basics
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [domain, setDomain] = useState('');
-  const [semester, setSemester] = useState('');
+  const [title, setTitle] = useState(prefill?.title || '');
+  const [description, setDescription] = useState(prefill?.description || '');
+  const [domain, setDomain] = useState(prefill?.domain || '');
+  const [semester, setSemester] = useState(prefill?.semester || '');
 
   // Step 2: Team & Skills
-  const [maxMembers, setMaxMembers] = useState('4');
+  const [maxMembers, setMaxMembers] = useState(
+    prefill?.teamSize ? String(parseInt(prefill.teamSize, 10) || 4) : '4'
+  );
   const [newSkill, setNewSkill] = useState('');
   const [skillLevel, setSkillLevel] = useState<'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED'>('INTERMEDIATE');
-  const [skills, setSkills] = useState<{ skillName: string; minimumExperience: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' }[]>([]);
+  const [skills, setSkills] = useState<{ skillName: string; minimumExperience: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' }[]>(
+    () => {
+      if (prefill?.techStack && Array.isArray(prefill.techStack)) {
+        return prefill.techStack.map((tech: string) => ({
+          skillName: tech,
+          minimumExperience: 'INTERMEDIATE' as const,
+        }));
+      }
+      return [];
+    }
+  );
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
