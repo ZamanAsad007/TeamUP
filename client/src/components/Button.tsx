@@ -23,6 +23,7 @@ export interface ButtonProps {
   textStyle?: StyleProp<TextStyle>;
   enableHaptics?: boolean;
   testID?: string;
+  size?: 'sm' | 'md' | 'lg';
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -35,6 +36,7 @@ export const Button: React.FC<ButtonProps> = ({
   textStyle,
   enableHaptics = true,
   testID,
+  size = 'md',
 }) => {
   const { colors, typography, borderRadius, spacing } = useTheme();
   const [scaleAnim] = useState(() => new Animated.Value(1));
@@ -42,8 +44,8 @@ export const Button: React.FC<ButtonProps> = ({
   const handlePressIn = () => {
     if (disabled || loading) return;
     Animated.spring(scaleAnim, {
-      toValue: 0.95,
-      speed: 20,
+      toValue: 0.96,
+      speed: 24,
       bounciness: 0,
       useNativeDriver: true,
     }).start();
@@ -53,8 +55,8 @@ export const Button: React.FC<ButtonProps> = ({
     if (disabled || loading) return;
     Animated.spring(scaleAnim, {
       toValue: 1,
-      stiffness: 300,
-      damping: 15,
+      stiffness: 350,
+      damping: 18,
       useNativeDriver: true,
     }).start();
   };
@@ -103,23 +105,39 @@ export const Button: React.FC<ButtonProps> = ({
     }
   };
 
+  const getMinHeight = () => {
+    switch (size) {
+      case 'sm':
+        return 38;
+      case 'lg':
+        return 50;
+      case 'md':
+      default:
+        return 44; // 44px min touch target
+    }
+  };
+
   return (
     <Animated.View style={[{ transform: [{ scale: scaleAnim }] }, style]}>
       <Pressable
         testID={testID}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: disabled || loading }}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         onPress={handlePress}
         disabled={disabled || loading}
+        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
         style={[
           styles.container,
           {
             backgroundColor: getBackgroundColor(),
-            borderRadius: borderRadius.bento,
+            borderRadius: borderRadius.md,
             borderColor: variant === 'outline' ? colors.outlineVariant : 'transparent',
             borderWidth: variant === 'outline' ? 1 : 0,
-            paddingVertical: spacing.sm + 4,
+            paddingVertical: spacing.sm + 2,
             paddingHorizontal: spacing.lg,
+            minHeight: getMinHeight(),
           },
         ]}
       >
@@ -131,8 +149,8 @@ export const Button: React.FC<ButtonProps> = ({
               styles.text,
               {
                 color: getTextColor(),
-                fontSize: typography.bodyLarge.fontSize,
-                fontWeight: typography.titleMedium.fontWeight,
+                fontSize: typography.body.fontSize,
+                fontWeight: typography.h3.fontWeight,
               },
               textStyle,
             ]}

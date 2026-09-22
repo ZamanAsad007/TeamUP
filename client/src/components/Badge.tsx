@@ -4,7 +4,7 @@ import { useTheme } from '../theme/ThemeContext';
 
 export interface BadgeProps {
   label: string | number;
-  variant?: 'primary' | 'secondary' | 'tertiary' | 'error';
+  variant?: 'primary' | 'secondary' | 'tertiary' | 'error' | 'warning' | 'accent';
   style?: StyleProp<ViewStyle>;
   textStyle?: StyleProp<TextStyle>;
 }
@@ -20,28 +20,34 @@ export const Badge: React.FC<BadgeProps> = ({
   const getBackgroundColor = () => {
     switch (variant) {
       case 'secondary':
-        return colors.secondaryContainer;
+        return colors.secondarySoft;
       case 'tertiary':
+      case 'accent':
         return colors.tertiaryContainer;
+      case 'warning':
+        return '#FEF3C7';
       case 'error':
         return colors.errorContainer;
       case 'primary':
       default:
-        return colors.primaryContainer;
+        return colors.primarySoft;
     }
   };
 
   const getTextColor = () => {
     switch (variant) {
       case 'secondary':
-        return colors.onSecondaryContainer;
+        return colors.secondary;
       case 'tertiary':
-        return colors.onTertiaryContainer;
+      case 'accent':
+        return colors.accent;
+      case 'warning':
+        return '#B45309';
       case 'error':
-        return colors.onErrorContainer;
+        return colors.error;
       case 'primary':
       default:
-        return colors.onPrimaryContainer;
+        return colors.primary;
     }
   };
 
@@ -63,8 +69,8 @@ export const Badge: React.FC<BadgeProps> = ({
           styles.text,
           {
             color: getTextColor(),
-            fontSize: typography.labelMedium.fontSize,
-            fontWeight: '600',
+            fontSize: typography.label.fontSize,
+            fontWeight: typography.label.fontWeight,
           },
           textStyle,
         ]}

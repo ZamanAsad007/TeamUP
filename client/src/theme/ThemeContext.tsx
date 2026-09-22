@@ -1,12 +1,21 @@
 import React, { createContext, useContext, useState, useMemo } from 'react';
 import { useColorScheme } from 'react-native';
-import { ColorScheme, darkColorScheme, lightColorScheme, typography, spacing, borderRadius } from './tokens';
+import {
+  ColorScheme,
+  darkColorScheme,
+  lightColorScheme,
+  typography,
+  spacing,
+  borderRadius,
+  elevation,
+} from './tokens';
 
 interface ThemeContextType {
   colors: ColorScheme;
   typography: typeof typography;
   spacing: typeof spacing;
   borderRadius: typeof borderRadius;
+  elevation: typeof elevation;
   isDark: boolean;
   toggleTheme: () => void;
   setThemeMode: (mode: 'light' | 'dark' | 'system') => void;
@@ -37,6 +46,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       typography,
       spacing,
       borderRadius,
+      elevation,
       isDark,
       toggleTheme,
       setThemeMode,
