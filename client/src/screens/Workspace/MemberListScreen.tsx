@@ -1,13 +1,15 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
+  ScrollView,
   Alert,
   RefreshControl,
+  TouchableOpacity,
 } from 'react-native';
 import { useTheme } from '../../theme/ThemeContext';
+import { AppHeader } from '../../components/AppHeader';
 import { Card } from '../../components/Card';
 import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
@@ -26,10 +28,11 @@ export interface MemberListScreenProps {
   navigation?: any;
 }
 
-export const MemberListScreen: React.FC<MemberListScreenProps> = ({ route }) => {
-  const { colors, typography, spacing } = useTheme();
+export const MemberListScreen: React.FC<MemberListScreenProps> = ({ route, navigation }) => {
+  const { colors, typography, spacing, borderRadius } = useTheme();
   const { user } = useAuth();
   const projectId = route?.params?.projectId || '';
+  const projectTitle = route?.params?.projectTitle || 'Team Members';
 
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [screenState, setScreenState] = useState<ScreenState>('loading');
@@ -69,9 +72,13 @@ export const MemberListScreen: React.FC<MemberListScreenProps> = ({ route }) => 
     }
   };
 
-  // Check if current user is LEADER
   const currentMember = members.find((m) => m.userId === user?.id);
   const isLeader = currentMember?.role === 'LEADER';
+
+  // Separate Accepted Members from Pending Applications
+  const acceptedMembers = useMemo(() => members.filter((m) => m.status === 'ACCEPTED'), [members]);
+  const pendingMembers = useMemo(() => members.filter((m) => m.status === 'PENDING'), [members]);
+  const otherMembers = useMemo(() => members.filter((m) => m.status !== 'ACCEPTED' && m.status !== 'PENDING'), [members]);
 
   const handleUpdateStatus = async (memberId: string, status: 'ACCEPTED' | 'REJECTED') => {
     try {
@@ -106,29 +113,50 @@ export const MemberListScreen: React.FC<MemberListScreenProps> = ({ route }) => 
     );
   };
 
-  const renderMemberItem = ({ item }: { item: ProjectMember }) => {
+  const renderMemberCard = (item: ProjectMember) => {
     const displayName = item.user?.profile?.fullName || item.user?.email || 'Team Member';
     const email = item.user?.email || '';
     const department = item.user?.profile?.department || 'Department N/A';
     const isSelf = item.userId === user?.id;
 
     return (
-      <Card style={[styles.memberCard, { marginBottom: spacing.md }]}>
+      <Card key={item.id} style={[styles.memberCard, { marginBottom: spacing.sm }]}>
         <View style={styles.cardTopRow}>
-          <View style={{ flex: 1, marginRight: spacing.sm }}>
-            <Text style={[typography.titleMedium, { color: colors.onSurface }]}>
+          <View
+            style={[
+              styles.memberAvatar,
+              {
+                backgroundColor: item.role === 'LEADER' ? colors.primarySoft : colors.secondarySoft,
+                borderColor: item.role === 'LEADER' ? colors.primary : colors.secondary,
+              },
+            ]}
+          >
+            <Text
+              style={{
+                color: item.role === 'LEADER' ? colors.primary : colors.secondary,
+                fontWeight: '700',
+                fontSize: 16,
+              }}
+            >
+              {displayName.charAt(0).toUpperCase()}
+            </Text>
+          </View>
+
+          <View style={{ flex: 1, marginLeft: 12, marginRight: spacing.sm }}>
+            <Text style={[typography.h3, { color: colors.text }]}>
               {displayName} {isSelf && '(You)'}
             </Text>
-            <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginTop: 2 }]}>
+            <Text style={[typography.bodySmall, { color: colors.textMuted, marginTop: 2 }]}>
               {email} • {department}
             </Text>
           </View>
+
           <View style={styles.badgesCol}>
             <Badge
               label={item.role}
               variant={item.role === 'LEADER' ? 'primary' : 'secondary'}
             />
-            <View style={{ marginTop: spacing.xs }}>
+            <View style={{ marginTop: 4 }}>
               <Badge
                 label={item.status}
                 variant={
@@ -151,12 +179,14 @@ export const MemberListScreen: React.FC<MemberListScreenProps> = ({ route }) => 
                   title="Accept"
                   variant="primary"
                   onPress={() => handleUpdateStatus(item.id, 'ACCEPTED')}
+                  size="sm"
                   style={{ marginRight: spacing.sm }}
                 />
                 <Button
                   title="Reject"
                   variant="outline"
                   onPress={() => handleUpdateStatus(item.id, 'REJECTED')}
+                  size="sm"
                   style={{ marginRight: spacing.sm }}
                 />
               </>
@@ -166,6 +196,7 @@ export const MemberListScreen: React.FC<MemberListScreenProps> = ({ route }) => 
                 title="Remove"
                 variant="outline"
                 onPress={() => handleRemoveMember(item.id, displayName)}
+                size="sm"
               />
             )}
           </View>
@@ -176,6 +207,13 @@ export const MemberListScreen: React.FC<MemberListScreenProps> = ({ route }) => 
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <AppHeader
+        title="Team Members"
+        subtitle={`${members.length} total • ${projectTitle}`}
+        showBack={Boolean(navigation?.canGoBack && navigation.canGoBack())}
+        onBack={() => navigation?.goBack?.()}
+      />
+
       <StateWrapper
         state={screenState}
         errorMessage={errorMessage}
@@ -183,11 +221,9 @@ export const MemberListScreen: React.FC<MemberListScreenProps> = ({ route }) => 
         emptyTitle="No Members Found"
         emptySubtitle="No collaborators are currently part of this project."
       >
-        <FlatList
-          data={members}
-          keyExtractor={(item) => item.id}
-          renderItem={renderMemberItem}
-          contentContainerStyle={{ padding: spacing.md }}
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={{ padding: spacing.screenPadding, paddingBottom: 60 }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -195,7 +231,50 @@ export const MemberListScreen: React.FC<MemberListScreenProps> = ({ route }) => 
               tintColor={colors.primary}
             />
           }
-        />
+        >
+          {/* Pending Applications Section (If any) */}
+          {pendingMembers.length > 0 && (
+            <View style={{ marginBottom: spacing.md }}>
+              <Text
+                style={[
+                  styles.sectionHeading,
+                  { color: colors.accent, fontSize: typography.label.fontSize },
+                ]}
+              >
+                PENDING APPLICATIONS ({pendingMembers.length})
+              </Text>
+              {pendingMembers.map(renderMemberCard)}
+            </View>
+          )}
+
+          {/* Confirmed Members Section */}
+          <View>
+            <Text
+              style={[
+                styles.sectionHeading,
+                { color: colors.textMuted, fontSize: typography.label.fontSize },
+              ]}
+            >
+              MEMBERS ({acceptedMembers.length})
+            </Text>
+            {acceptedMembers.map(renderMemberCard)}
+          </View>
+
+          {/* Other/Rejected Members if any */}
+          {otherMembers.length > 0 && (
+            <View style={{ marginTop: spacing.md }}>
+              <Text
+                style={[
+                  styles.sectionHeading,
+                  { color: colors.textMuted, fontSize: typography.label.fontSize },
+                ]}
+              >
+                PREVIOUS ({otherMembers.length})
+              </Text>
+              {otherMembers.map(renderMemberCard)}
+            </View>
+          )}
+        </ScrollView>
       </StateWrapper>
     </View>
   );
@@ -205,11 +284,25 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  memberCard: {},
+  sectionHeading: {
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    marginBottom: 8,
+  },
+  memberCard: {
+    padding: 14,
+  },
   cardTopRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+  },
+  memberAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   badgesCol: {
     alignItems: 'flex-end',

@@ -8,9 +8,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../theme/ThemeContext';
+import { AppHeader } from '../../components/AppHeader';
 import { Badge } from '../../components/Badge';
 import { StateWrapper, ScreenState } from '../../components/StateWrapper';
 import { socketService, ChatMessage, SocketConnectionStatus } from '../../services/socketService';
@@ -31,7 +33,7 @@ interface DisplayMessage extends ChatMessage {
   isPending?: boolean;
 }
 
-export const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
+export const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
   const { colors, typography, spacing, borderRadius } = useTheme();
   const { user } = useAuth();
   const projectId = route?.params?.projectId || '';
@@ -49,7 +51,6 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
   const initChat = useCallback(() => {
     if (!projectId) return;
 
-    // 1. Fetch initial history via REST endpoint as guaranteed baseline
     chatService
       .getProjectMessages(projectId)
       .then((history) => {
@@ -58,11 +59,9 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
         setErrorMessage(undefined);
       })
       .catch((err: any) => {
-        // Even if REST fails, WebSocket may provide messages
         console.warn('Initial REST message fetch failed, connecting to WS:', err.message);
       });
 
-    // 2. Connect to WebSocket & join room
     socketService
       .connect()
       .then(() => {
@@ -76,7 +75,6 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
   useEffect(() => {
     initChat();
 
-    // Listen to connection status changes
     const unsubStatus = socketService.onStatusChange((status) => {
       setConnectionStatus(status);
       if (status === 'connected') {
@@ -84,12 +82,10 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
       }
     });
 
-    // Listen to incoming real-time broadcast messages
     const unsubNewMessage = socketService.onNewMessage((newMsg) => {
       if (newMsg.projectId !== projectId) return;
 
       setMessages((prev) => {
-        // Reconcile: If there is an optimistic pending message matching this sender and content, replace it
         const pendingIndex = prev.findIndex(
           (m) => m.isPending && m.content === newMsg.content && m.senderId === newMsg.senderId
         );
@@ -100,7 +96,6 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
           return updated;
         }
 
-        // Avoid duplicate messages
         if (prev.some((m) => m.id === newMsg.id)) {
           return prev;
         }
@@ -114,11 +109,9 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
       }, 100);
     });
 
-    // Listen to WebSocket history event
     const unsubHistory = socketService.onMessageHistory((history) => {
       if (Array.isArray(history)) {
         setMessages((prev) => {
-          // Merge unique messages
           const existingIds = new Set(prev.map((m) => m.id));
           const toAdd = history.filter((m) => !existingIds.has(m.id));
           const merged = [...prev, ...toAdd].sort(
@@ -164,7 +157,6 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
       },
     };
 
-    // Optimistically add to UI
     setMessages((prev) => [...prev, optimisticMessage]);
     setScreenState('populated');
     setInputText('');
@@ -173,16 +165,22 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
       flatListRef.current?.scrollToEnd({ animated: true });
     }, 50);
 
-    // Emit via WebSocket
     socketService.sendMessage(projectId, trimmed, (response) => {
       if (response && response.success && response.message) {
-        // Reconcile optimistic message with server response
         const confirmedMsg = response.message;
         setMessages((prev) =>
           prev.map((m) => (m.id === tempId ? { ...confirmedMsg, isPending: false } : m))
         );
       }
     });
+  };
+
+  const handleAttachment = () => {
+    Alert.alert('Share with Team', 'Select an attachment type:', [
+      { text: 'Image', onPress: () => {} },
+      { text: 'Document', onPress: () => {} },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   };
 
   const renderMessageItem = ({ item }: { item: DisplayMessage }) => {
@@ -197,50 +195,69 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
         style={[
           styles.messageRow,
           isOwn ? styles.messageRowOwn : styles.messageRowOther,
-          { marginBottom: spacing.sm },
+          { marginBottom: spacing.md },
         ]}
       >
-        <View
-          style={[
-            styles.messageBubble,
-            {
-              backgroundColor: isOwn ? colors.primaryContainer : colors.surfaceVariant,
-              borderColor: colors.outlineVariant,
-              borderRadius: borderRadius.bento,
-              padding: spacing.sm,
-            },
-            isOwn ? styles.bubbleOwn : styles.bubbleOther,
-          ]}
-        >
+        {!isOwn && (
+          <View
+            style={[
+              styles.avatarMini,
+              { backgroundColor: colors.secondarySoft, borderColor: colors.secondary },
+            ]}
+          >
+            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.secondary }}>
+              {senderName.charAt(0).toUpperCase()}
+            </Text>
+          </View>
+        )}
+
+        <View style={{ maxWidth: '78%' }}>
           {!isOwn && (
-            <Text style={[typography.labelMedium, { color: colors.primary, marginBottom: 2 }]}>
+            <Text
+              style={[
+                typography.label,
+                { color: colors.textMuted, marginBottom: 2, marginLeft: 2 },
+              ]}
+            >
               {senderName}
             </Text>
           )}
 
-          <Text
+          <View
             style={[
-              typography.bodyMedium,
-              { color: isOwn ? colors.onPrimaryContainer : colors.onSurface },
+              styles.messageBubble,
+              {
+                backgroundColor: isOwn ? colors.primary : colors.surfaceMuted,
+                borderRadius: borderRadius.md,
+                borderColor: isOwn ? colors.primary : colors.border,
+                padding: spacing.md,
+              },
+              isOwn ? styles.bubbleOwn : styles.bubbleOther,
             ]}
           >
-            {item.content}
-          </Text>
-
-          <View style={styles.messageMetaRow}>
             <Text
               style={[
-                typography.labelMedium,
-                {
-                  fontSize: 10,
-                  color: isOwn ? colors.onPrimaryContainer : colors.onSurfaceVariant,
-                  opacity: 0.7,
-                  marginTop: 2,
-                },
+                typography.body,
+                { color: isOwn ? '#FFFFFF' : colors.text },
               ]}
             >
-              {timeFormatted} {item.isPending ? '• Sending...' : ''}
+              {item.content}
             </Text>
+
+            <View style={styles.messageMetaRow}>
+              <Text
+                style={[
+                  typography.bodySmall,
+                  {
+                    fontSize: 10,
+                    color: isOwn ? 'rgba(255,255,255,0.75)' : colors.textMuted,
+                    marginTop: 4,
+                  },
+                ]}
+              >
+                {timeFormatted} {item.isPending ? '• Sending...' : ''}
+              </Text>
+            </View>
           </View>
         </View>
       </View>
@@ -253,24 +270,37 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
-      {/* Top status bar */}
-      <View style={[styles.topBanner, { backgroundColor: colors.surface, borderColor: colors.outlineVariant }]}>
-        <View style={styles.topBannerRow}>
-          <Text style={[typography.titleMedium, { color: colors.onSurface }]} numberOfLines={1}>
-            {projectTitle}
-          </Text>
-          <Badge
-            label={
-              connectionStatus === 'connected'
-                ? 'Online'
-                : connectionStatus === 'connecting'
-                ? 'Connecting...'
-                : connectionStatus === 'reconnecting'
-                ? 'Reconnecting...'
-                : 'Offline'
-            }
-            variant={connectionStatus === 'connected' ? 'secondary' : 'tertiary'}
-          />
+      <AppHeader
+        title={projectTitle}
+        subtitle="Team Chat"
+        showBack={Boolean(navigation?.canGoBack && navigation.canGoBack())}
+        onBack={() => navigation?.goBack?.()}
+        actions={[
+          {
+            icon: (
+              <Badge
+                label={
+                  connectionStatus === 'connected'
+                    ? 'Online'
+                    : connectionStatus === 'connecting'
+                    ? 'Connecting...'
+                    : connectionStatus === 'reconnecting'
+                    ? 'Reconnecting...'
+                    : 'Offline'
+                }
+                variant={connectionStatus === 'connected' ? 'secondary' : 'tertiary'}
+              />
+            ),
+            onPress: () => {},
+            accessibilityLabel: 'Connection Status',
+          },
+        ]}
+      />
+
+      {/* Date Divider Badge */}
+      <View style={styles.dateSeparatorRow}>
+        <View style={[styles.dateBadge, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
+          <Text style={[typography.label, { color: colors.textMuted, fontSize: 10 }]}>TODAY</Text>
         </View>
       </View>
 
@@ -288,7 +318,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
             data={messages}
             keyExtractor={(item) => item.id}
             renderItem={renderMessageItem}
-            contentContainerStyle={{ padding: spacing.md }}
+            contentContainerStyle={{ padding: spacing.screenPadding, paddingBottom: 16 }}
             onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
           />
         </StateWrapper>
@@ -300,47 +330,59 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
           styles.composerContainer,
           {
             backgroundColor: colors.surface,
-            borderColor: colors.outlineVariant,
-            paddingHorizontal: spacing.md,
+            borderTopColor: colors.border,
+            paddingHorizontal: spacing.screenPadding,
             paddingVertical: spacing.sm,
           },
         ]}
       >
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Add attachment"
+          onPress={handleAttachment}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={[styles.attachButton, { backgroundColor: colors.surfaceMuted }]}
+        >
+          <Text style={{ fontSize: 18, color: colors.text }}>+</Text>
+        </TouchableOpacity>
+
         <TextInput
           style={[
             styles.composerInput,
             {
-              backgroundColor: colors.surfaceVariant,
-              color: colors.onSurface,
-              borderColor: colors.outlineVariant,
+              backgroundColor: colors.surfaceMuted,
+              color: colors.text,
+              borderColor: colors.border,
               borderRadius: borderRadius.pill,
               paddingHorizontal: spacing.md,
               paddingVertical: spacing.sm,
             },
           ]}
           placeholder="Type a message..."
-          placeholderTextColor={colors.onSurfaceVariant}
+          placeholderTextColor={colors.textMuted}
           value={inputText}
           onChangeText={setInputText}
           multiline
           maxLength={1000}
         />
+
         <TouchableOpacity
+          accessibilityRole="button"
           onPress={handleSendMessage}
           disabled={!inputText.trim()}
           style={[
             styles.sendButton,
             {
-              backgroundColor: inputText.trim() ? colors.primary : colors.surfaceVariant,
+              backgroundColor: inputText.trim() ? colors.primary : colors.surfaceMuted,
               borderRadius: borderRadius.pill,
-              marginLeft: spacing.sm,
+              marginLeft: spacing.xs + 2,
             },
           ]}
         >
           <Text
             style={[
-              typography.labelMedium,
-              { color: inputText.trim() ? colors.onPrimary : colors.onSurfaceVariant, fontWeight: '700' },
+              typography.label,
+              { color: inputText.trim() ? '#FFFFFF' : colors.textMuted, fontWeight: '700' },
             ]}
           >
             Send
@@ -355,21 +397,22 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  topBanner: {
-    borderBottomWidth: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  topBannerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  dateSeparatorRow: {
     alignItems: 'center',
+    marginVertical: 10,
+  },
+  dateBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 3,
+    borderRadius: 12,
+    borderWidth: 1,
   },
   messageListContainer: {
     flex: 1,
   },
   messageRow: {
     flexDirection: 'row',
+    alignItems: 'flex-end',
   },
   messageRowOwn: {
     justifyContent: 'flex-end',
@@ -377,15 +420,24 @@ const styles = StyleSheet.create({
   messageRowOther: {
     justifyContent: 'flex-start',
   },
+  avatarMini: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+    marginBottom: 2,
+  },
   messageBubble: {
-    maxWidth: '78%',
     borderWidth: 1,
   },
   bubbleOwn: {
-    borderBottomRightRadius: 2,
+    borderBottomRightRadius: 4,
   },
   bubbleOther: {
-    borderBottomLeftRadius: 2,
+    borderBottomLeftRadius: 4,
   },
   messageMetaRow: {
     flexDirection: 'row',
@@ -396,6 +448,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderTopWidth: 1,
   },
+  attachButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
   composerInput: {
     flex: 1,
     borderWidth: 1,
@@ -405,6 +465,7 @@ const styles = StyleSheet.create({
   sendButton: {
     paddingHorizontal: 16,
     paddingVertical: 10,
+    minHeight: 38,
     justifyContent: 'center',
     alignItems: 'center',
   },
