@@ -1,18 +1,20 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
-  TextInput,
   RefreshControl,
   TouchableOpacity,
+  ScrollView,
 } from 'react-native';
+import { useSafeInsets } from '../../utils/useSafeInsets';
 import { useTheme } from '../../theme/ThemeContext';
 import { Card } from '../../components/Card';
 import { Badge } from '../../components/Badge';
 import { Chip } from '../../components/Chip';
 import { Button } from '../../components/Button';
+import { SearchBar } from '../../components/SearchBar';
 import { StateWrapper, ScreenState } from '../../components/StateWrapper';
 import { projectService, Project } from '../../services/projectService';
 import { useAuth } from '../../context/AuthContext';
@@ -21,21 +23,37 @@ export interface MarketplaceScreenProps {
   navigation?: any;
 }
 
+const DOMAIN_FILTERS = ['All', 'Web', 'Mobile', 'AI', 'Design'];
+
 export const MarketplaceScreen: React.FC<MarketplaceScreenProps> = ({ navigation }) => {
   const { colors, typography, spacing, borderRadius } = useTheme();
+  const insets = useSafeInsets();
   const { user } = useAuth();
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [screenState, setScreenState] = useState<ScreenState>('loading');
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedDomain, setSelectedDomain] = useState('All');
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchProjects = useCallback((search?: string) => {
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+    const name = user?.fullName ? user.fullName.split(' ')[0] : 'there';
+    if (hour < 12) return `Good morning, ${name} 👋`;
+    if (hour < 18) return `Good afternoon, ${name} 👋`;
+    return `Good evening, ${name} 👋`;
+  }, [user]);
+
+  const fetchProjects = useCallback((search?: string, domain?: string) => {
     const params: Record<string, any> = {};
     if (search && search.trim().length > 0) {
       params.search = search.trim();
     }
+    if (domain && domain !== 'All') {
+      params.domain = domain;
+    }
+
     projectService
       .getProjects(params)
       .then((data) => {
@@ -60,6 +78,9 @@ export const MarketplaceScreen: React.FC<MarketplaceScreenProps> = ({ navigation
       if (searchQuery.trim().length > 0) {
         params.search = searchQuery.trim();
       }
+      if (selectedDomain !== 'All') {
+        params.domain = selectedDomain;
+      }
       const data = await projectService.getProjects(params);
       setProjects(data);
       setScreenState(data.length === 0 ? 'empty' : 'populated');
@@ -76,8 +97,24 @@ export const MarketplaceScreen: React.FC<MarketplaceScreenProps> = ({ navigation
 
   const executeSearch = () => {
     setScreenState('loading');
-    fetchProjects(searchQuery);
+    fetchProjects(searchQuery, selectedDomain);
   };
+
+  const handleSelectDomain = (domain: string) => {
+    setSelectedDomain(domain);
+    setScreenState('loading');
+    fetchProjects(searchQuery, domain);
+  };
+
+  const featuredProject = useMemo(() => {
+    if (projects.length > 0) return projects[0];
+    return null;
+  }, [projects]);
+
+  const regularProjects = useMemo(() => {
+    if (projects.length > 1) return projects.slice(1);
+    return projects;
+  }, [projects]);
 
   const renderProjectItem = ({ item }: { item: Project }) => {
     const isCreator = user?.id === item.creatorId;
@@ -91,12 +128,27 @@ export const MarketplaceScreen: React.FC<MarketplaceScreenProps> = ({ navigation
       >
         <View style={styles.cardHeader}>
           <View style={styles.titleContainer}>
-            <Text style={[typography.titleMedium, { color: colors.onSurface }]} numberOfLines={1}>
-              {item.title}
-            </Text>
-            <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginTop: spacing.xs }]} numberOfLines={2}>
-              {item.description}
-            </Text>
+            <View style={styles.iconTitleRow}>
+              <View
+                style={[
+                  styles.projectIconBadge,
+                  { backgroundColor: colors.primarySoft, borderRadius: borderRadius.sm },
+                ]}
+              >
+                <Text style={{ fontSize: 16 }}>🚀</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[typography.h3, { color: colors.text }]} numberOfLines={1}>
+                  {item.title}
+                </Text>
+                <Text
+                  style={[typography.bodySmall, { color: colors.textMuted, marginTop: 2 }]}
+                  numberOfLines={2}
+                >
+                  {item.description}
+                </Text>
+              </View>
+            </View>
           </View>
           <Badge
             label={item.status || 'OPEN'}
@@ -106,7 +158,7 @@ export const MarketplaceScreen: React.FC<MarketplaceScreenProps> = ({ navigation
 
         <View style={[styles.metaRow, { marginTop: spacing.sm }]}>
           <Chip label={item.domain} style={{ marginRight: spacing.xs }} />
-          <Chip label={item.semester} style={{ marginRight: spacing.xs }} />
+          {item.semester ? <Chip label={item.semester} style={{ marginRight: spacing.xs }} /> : null}
           <Badge
             label={`${memberCount}/${item.maxMembers || 4} Members`}
             variant="tertiary"
@@ -114,7 +166,7 @@ export const MarketplaceScreen: React.FC<MarketplaceScreenProps> = ({ navigation
         </View>
 
         {item.requiredSkills && item.requiredSkills.length > 0 && (
-          <View style={[styles.skillsRow, { marginTop: spacing.sm }]}>
+          <View style={[styles.skillsRow, { marginTop: spacing.xs }]}>
             {item.requiredSkills.slice(0, 3).map((req, idx) => {
               const skillName = req.skill?.name || req.skillName || 'Skill';
               return (
@@ -135,11 +187,16 @@ export const MarketplaceScreen: React.FC<MarketplaceScreenProps> = ({ navigation
         )}
 
         <View style={[styles.cardFooter, { marginTop: spacing.md }]}>
-          {(isCreator || isMember) ? (
+          {isCreator || isMember ? (
             <Button
               title="Open Workspace"
               variant="secondary"
-              onPress={() => navigation?.navigate('Workspace', { projectId: item.id, projectTitle: item.title })}
+              onPress={() =>
+                navigation?.navigate('Workspace', {
+                  projectId: item.id,
+                  projectTitle: item.title,
+                })
+              }
             />
           ) : (
             <Button
@@ -155,51 +212,99 @@ export const MarketplaceScreen: React.FC<MarketplaceScreenProps> = ({ navigation
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { padding: spacing.md, backgroundColor: colors.surface }]}>
+      {/* Header section with Greeting and Actions */}
+      <View
+        style={[
+          styles.header,
+          {
+            paddingTop: insets.top + spacing.sm,
+            paddingHorizontal: spacing.screenPadding,
+            backgroundColor: colors.surface,
+            borderBottomColor: colors.border,
+          },
+        ]}
+      >
         <View style={styles.headerTop}>
-          <Text style={[typography.headlineMedium, { color: colors.onSurface }]}>Marketplace</Text>
-          <Button
-            title="+ Create"
-            variant="primary"
-            onPress={() => navigation?.navigate('CreateProject')}
-          />
+          <View>
+            <Text
+              style={[
+                styles.greetingText,
+                { color: colors.text, fontSize: typography.h2.fontSize, fontWeight: '700' },
+              ]}
+            >
+              {greeting}
+            </Text>
+            <Text style={[typography.bodySmall, { color: colors.textMuted, marginTop: 2 }]}>
+              Find something worth building.
+            </Text>
+          </View>
+
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Notifications"
+              onPress={() => navigation?.navigate('Notifications')}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={[styles.actionBtn, { backgroundColor: colors.surfaceMuted }]}
+            >
+              <Text style={{ fontSize: 18 }}>🔔</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Create Project"
+              onPress={() => navigation?.navigate('CreateProject')}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={[
+                styles.createBtn,
+                { backgroundColor: colors.primary, borderRadius: borderRadius.pill },
+              ]}
+            >
+              <Text style={styles.createBtnText}>+ Create</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        <View style={[styles.searchBarContainer, { marginTop: spacing.sm }]}>
-          <TextInput
-            style={[
-              styles.searchInput,
-              {
-                backgroundColor: colors.surfaceVariant,
-                color: colors.onSurface,
-                borderRadius: borderRadius.md,
-                borderColor: colors.outlineVariant,
-                paddingHorizontal: spacing.md,
-                paddingVertical: spacing.sm,
-              },
-            ]}
-            placeholder="Search projects by title, domain, tech..."
-            placeholderTextColor={colors.onSurfaceVariant}
+        {/* Global Search Bar */}
+        <View style={{ marginTop: spacing.md }}>
+          <SearchBar
             value={searchQuery}
             onChangeText={handleSearch}
             onSubmitEditing={executeSearch}
-            returnKeyType="search"
+            onClear={() => {
+              setSearchQuery('');
+              fetchProjects('', selectedDomain);
+            }}
+            placeholder="Search projects by title, domain, tech..."
           />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={executeSearch} style={[styles.searchBtn, { marginLeft: spacing.xs }]}>
-              <Text style={{ color: colors.primary, fontWeight: '600' }}>Search</Text>
-            </TouchableOpacity>
-          )}
         </View>
+
+        {/* Horizontal Domain Filter Chips */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={[styles.filtersScroll, { paddingVertical: spacing.sm }]}
+        >
+          {DOMAIN_FILTERS.map((domain) => (
+            <Chip
+              key={domain}
+              label={domain}
+              selected={selectedDomain === domain}
+              onPress={() => handleSelectDomain(domain)}
+              style={{ marginRight: spacing.xs }}
+            />
+          ))}
+        </ScrollView>
       </View>
 
+      {/* Main Content Area */}
       <View style={styles.body}>
         <StateWrapper
           state={screenState}
           errorMessage={errorMessage}
           onRetry={() => {
             setScreenState('loading');
-            fetchProjects(searchQuery);
+            fetchProjects(searchQuery, selectedDomain);
           }}
           emptyTitle="No Projects Found"
           emptySubtitle="Be the first to create an exciting new project listing!"
@@ -210,7 +315,7 @@ export const MarketplaceScreen: React.FC<MarketplaceScreenProps> = ({ navigation
             data={projects}
             keyExtractor={(item) => item.id}
             renderItem={renderProjectItem}
-            contentContainerStyle={{ padding: spacing.md }}
+            contentContainerStyle={{ padding: spacing.screenPadding, paddingBottom: 60 }}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -231,24 +336,43 @@ const styles = StyleSheet.create({
   },
   header: {
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.05)',
+    paddingBottom: 4,
   },
   headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  searchBarContainer: {
+  greetingText: {
+    letterSpacing: -0.2,
+  },
+  headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  searchInput: {
-    flex: 1,
-    borderWidth: 1,
-    fontSize: 14,
+  actionBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
   },
-  searchBtn: {
-    paddingHorizontal: 8,
+  createBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    minHeight: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  createBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  filtersScroll: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   body: {
     flex: 1,
@@ -262,6 +386,18 @@ const styles = StyleSheet.create({
   titleContainer: {
     flex: 1,
     marginRight: 8,
+  },
+  iconTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  projectIconBadge: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+    marginTop: 2,
   },
   metaRow: {
     flexDirection: 'row',

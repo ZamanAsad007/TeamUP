@@ -9,7 +9,7 @@ import {
   Platform,
   StatusBar,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeInsets } from '../utils/useSafeInsets';
 import { useTheme } from '../theme/ThemeContext';
 
 export interface HeaderAction {
@@ -39,7 +39,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   style,
   children,
 }) => {
-  const insets = useSafeAreaInsets();
+  const insets = useSafeInsets();
   const { colors, typography, spacing } = useTheme();
 
   const topPadding = Platform.OS === 'android' ? Math.max(insets.top, StatusBar.currentHeight || 0) : insets.top;
