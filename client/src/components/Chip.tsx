@@ -72,10 +72,11 @@ export const Chip: React.FC<ChipProps> = ({
     <Pressable
       testID={testID}
       accessibilityRole="button"
+      accessibilityLabel={label}
       accessibilityState={{ selected }}
       onPress={onPress}
       disabled={!onPress}
-      hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+      hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
       style={[
         styles.chip,
         {

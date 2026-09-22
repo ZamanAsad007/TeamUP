@@ -122,12 +122,13 @@ export const Button: React.FC<ButtonProps> = ({
       <Pressable
         testID={testID}
         accessibilityRole="button"
+        accessibilityLabel={title}
         accessibilityState={{ disabled: disabled || loading }}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         onPress={handlePress}
         disabled={disabled || loading}
-        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         style={[
           styles.container,
           {

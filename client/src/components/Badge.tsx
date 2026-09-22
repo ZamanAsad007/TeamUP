@@ -53,6 +53,9 @@ export const Badge: React.FC<BadgeProps> = ({
 
   return (
     <View
+      accessible={true}
+      accessibilityRole="text"
+      accessibilityLabel={String(label)}
       style={[
         styles.badge,
         {
