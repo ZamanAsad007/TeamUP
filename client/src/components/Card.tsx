@@ -16,8 +16,9 @@ export interface CardProps {
   children: React.ReactNode;
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
-  variant?: 'surface' | 'surfaceVariant' | 'outline';
+  variant?: 'surface' | 'surfaceVariant' | 'surfaceMuted' | 'outline';
   enableHaptics?: boolean;
+  testID?: string;
 }
 
 export const Card: React.FC<CardProps> = ({
@@ -26,15 +27,16 @@ export const Card: React.FC<CardProps> = ({
   style,
   variant = 'surface',
   enableHaptics = false,
+  testID,
 }) => {
-  const { colors, borderRadius, spacing } = useTheme();
+  const { colors, borderRadius, spacing, elevation } = useTheme();
   const [scaleAnim] = useState(() => new Animated.Value(1));
 
   const handlePressIn = () => {
     if (!onPress) return;
     Animated.spring(scaleAnim, {
-      toValue: 0.97,
-      speed: 20,
+      toValue: 0.98,
+      speed: 24,
       bounciness: 0,
       useNativeDriver: true,
     }).start();
@@ -65,7 +67,8 @@ export const Card: React.FC<CardProps> = ({
   const getBackgroundColor = () => {
     switch (variant) {
       case 'surfaceVariant':
-        return colors.surfaceVariant;
+      case 'surfaceMuted':
+        return colors.surfaceMuted;
       case 'outline':
         return 'transparent';
       case 'surface':
@@ -76,22 +79,24 @@ export const Card: React.FC<CardProps> = ({
 
   const cardContent = (
     <View
+      testID={testID}
       style={[
         styles.card,
         {
           backgroundColor: getBackgroundColor(),
-          borderRadius: borderRadius.bento,
-          borderColor: colors.outlineVariant,
+          borderRadius: borderRadius.md,
+          borderColor: colors.border,
           borderWidth: 1,
-          padding: spacing.md,
+          padding: spacing.base,
         },
+        variant === 'surface' ? elevation.card : {},
         style,
       ]}
     >
       {React.Children.map(children, (child) => {
         if (typeof child === 'string') {
           if (!child.trim()) return null;
-          return <Text>{child}</Text>;
+          return <Text style={{ color: colors.text }}>{child}</Text>;
         }
         return child;
       })}
@@ -105,6 +110,8 @@ export const Card: React.FC<CardProps> = ({
   return (
     <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
       <Pressable
+        accessibilityRole="button"
+        hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         onPress={handlePress}

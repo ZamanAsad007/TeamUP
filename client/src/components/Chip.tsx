@@ -9,6 +9,7 @@ export interface ChipProps {
   style?: StyleProp<ViewStyle>;
   textStyle?: StyleProp<TextStyle>;
   variant?: 'primary' | 'secondary' | 'tertiary';
+  testID?: string;
 }
 
 export const Chip: React.FC<ChipProps> = ({
@@ -18,6 +19,7 @@ export const Chip: React.FC<ChipProps> = ({
   style,
   textStyle,
   variant = 'primary',
+  testID,
 }) => {
   const { colors, typography, borderRadius, spacing } = useTheme();
 
@@ -25,30 +27,30 @@ export const Chip: React.FC<ChipProps> = ({
     if (selected) {
       switch (variant) {
         case 'secondary':
-          return colors.secondaryContainer;
+          return colors.secondarySoft;
         case 'tertiary':
           return colors.tertiaryContainer;
         case 'primary':
         default:
-          return colors.primaryContainer;
+          return colors.primarySoft;
       }
     }
-    return colors.surfaceVariant;
+    return colors.surfaceMuted;
   };
 
   const getTextColor = () => {
     if (selected) {
       switch (variant) {
         case 'secondary':
-          return colors.onSecondaryContainer;
+          return colors.secondary;
         case 'tertiary':
-          return colors.onTertiaryContainer;
+          return colors.accent;
         case 'primary':
         default:
-          return colors.onPrimaryContainer;
+          return colors.primary;
       }
     }
-    return colors.onSurfaceVariant;
+    return colors.textMuted;
   };
 
   const getBorderColor = () => {
@@ -57,27 +59,33 @@ export const Chip: React.FC<ChipProps> = ({
         case 'secondary':
           return colors.secondary;
         case 'tertiary':
-          return colors.tertiary;
+          return colors.accent;
         case 'primary':
         default:
           return colors.primary;
       }
     }
-    return colors.outlineVariant;
+    return colors.border;
   };
 
   return (
     <Pressable
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected }}
       onPress={onPress}
       disabled={!onPress}
+      hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
       style={[
         styles.chip,
         {
           backgroundColor: getBackgroundColor(),
           borderColor: getBorderColor(),
           borderRadius: borderRadius.pill,
-          paddingHorizontal: spacing.md,
-          paddingVertical: spacing.xs + 2,
+          paddingHorizontal: spacing.base,
+          paddingVertical: spacing.xs + 3,
+          minHeight: 36,
         },
         style,
       ]}
@@ -87,7 +95,7 @@ export const Chip: React.FC<ChipProps> = ({
           styles.text,
           {
             color: getTextColor(),
-            fontSize: typography.bodyMedium.fontSize,
+            fontSize: typography.bodySmall.fontSize,
             fontWeight: selected ? '600' : '400',
           },
           textStyle,
@@ -103,6 +111,8 @@ const styles = StyleSheet.create({
   chip: {
     borderWidth: 1,
     alignSelf: 'flex-start',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginRight: 6,
     marginBottom: 6,
   },

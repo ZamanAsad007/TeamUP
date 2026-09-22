@@ -1,12 +1,14 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   RefreshControl,
+  TouchableOpacity,
 } from 'react-native';
 import { useTheme } from '../../theme/ThemeContext';
+import { AppHeader } from '../../components/AppHeader';
 import { Card } from '../../components/Card';
 import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
@@ -24,7 +26,7 @@ export interface WorkspaceHomeScreenProps {
 }
 
 export const WorkspaceHomeScreen: React.FC<WorkspaceHomeScreenProps> = ({ route, navigation }) => {
-  const { colors, typography, spacing, borderRadius } = useTheme();
+  const { colors, typography, spacing, borderRadius, elevation } = useTheme();
   const projectId = route?.params?.projectId || '';
   const initialTitle = route?.params?.projectTitle || 'Project Workspace';
 
@@ -83,161 +85,257 @@ export const WorkspaceHomeScreen: React.FC<WorkspaceHomeScreenProps> = ({ route,
   const chatMetrics = overview?.metrics?.chat || { totalMessages: 0 };
   const memberCount = overview?.members?.length || 0;
 
+  // Calculate completion percentage
+  const progressPercent = useMemo(() => {
+    if (!taskMetrics.total || taskMetrics.total === 0) return 0;
+    return Math.round((taskMetrics.done / taskMetrics.total) * 100);
+  }, [taskMetrics]);
+
   return (
-    <StateWrapper
-      state={screenState}
-      errorMessage={errorMessage}
-      errorCode="WORKSPACE_ACCESS"
-      onRetry={fetchOverview}
-      emptyTitle="Workspace Not Found"
-      emptySubtitle="This project workspace could not be located."
-      emptyActionLabel="Back to Projects"
-      onEmptyAction={() => navigation?.navigate('MainApp', { screen: 'Projects' })}
-    >
-      <ScrollView
-        style={[styles.container, { backgroundColor: colors.background }]}
-        contentContainerStyle={{ padding: spacing.md, paddingBottom: spacing.xl * 2 }}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.primary}
-          />
-        }
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <AppHeader
+        title="Workspace"
+        subtitle={`${memberCount} members • Active`}
+        showBack={true}
+        onBack={() => navigation?.goBack?.()}
+        actions={[
+          {
+            icon: <Text style={{ fontSize: 18 }}>💬</Text>,
+            onPress: () => navigation?.navigate('Chat', { projectId, projectTitle }),
+            accessibilityLabel: 'Open chat',
+          },
+        ]}
+      />
+
+      {/* Contextual Sticky Sub-Navigation */}
+      <View style={[styles.tabBar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <TouchableOpacity style={[styles.tabItem, { borderBottomColor: colors.primary, borderBottomWidth: 2.5 }]}>
+          <Text style={[styles.tabTextActive, { color: colors.primary }]}>Overview</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.tabItem}
+          onPress={() => navigation?.navigate('Kanban', { projectId, projectTitle })}
+        >
+          <Text style={[styles.tabText, { color: colors.textMuted }]}>Tasks</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.tabItem}
+          onPress={() => navigation?.navigate('Chat', { projectId, projectTitle })}
+        >
+          <Text style={[styles.tabText, { color: colors.textMuted }]}>Chat</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.tabItem}
+          onPress={() => navigation?.navigate('Members', { projectId, projectTitle })}
+        >
+          <Text style={[styles.tabText, { color: colors.textMuted }]}>Team</Text>
+        </TouchableOpacity>
+      </View>
+
+      <StateWrapper
+        state={screenState}
+        errorMessage={errorMessage}
+        errorCode="WORKSPACE_ACCESS"
+        onRetry={fetchOverview}
+        emptyTitle="Workspace Not Found"
+        emptySubtitle="This project workspace could not be located."
+        emptyActionLabel="Back to Projects"
+        onEmptyAction={() => navigation?.navigate('MainApp', { screen: 'Projects' })}
       >
-        {/* Header Bento Card */}
-        <Card style={{ marginBottom: spacing.md }}>
-          <View style={styles.headerRow}>
-            <View style={{ flex: 1, marginRight: spacing.sm }}>
-              <Text style={[typography.headlineMedium, { color: colors.onSurface }]} numberOfLines={2}>
-                {projectTitle}
-              </Text>
-              <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginTop: spacing.xs }]}>
-                {overview?.project?.domain || 'Workspace'} • {overview?.project?.semester || 'Active'}
-              </Text>
-            </View>
-            <Badge
-              label={isLeader ? 'Leader' : 'Member'}
-              variant={isLeader ? 'primary' : 'secondary'}
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={{ padding: spacing.screenPadding, paddingBottom: 60 }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
             />
-          </View>
-        </Card>
+          }
+        >
+          {/* Hero Project Cockpit Card */}
+          <Card style={[styles.cockpitCard, { marginBottom: spacing.md }]}>
+            <View style={styles.headerRow}>
+              <View style={{ flex: 1, marginRight: spacing.sm }}>
+                <Text
+                  style={[
+                    styles.projectTitleText,
+                    { color: colors.text, fontSize: typography.h2.fontSize, fontWeight: '700' },
+                  ]}
+                  numberOfLines={2}
+                >
+                  {projectTitle}
+                </Text>
+                <Text style={[typography.bodySmall, { color: colors.textMuted, marginTop: 2 }]}>
+                  {overview?.project?.domain || 'Workspace'} • {overview?.project?.semester || 'Active'}
+                </Text>
+              </View>
+              <Badge
+                label={isLeader ? 'Leader' : 'Member'}
+                variant={isLeader ? 'primary' : 'secondary'}
+              />
+            </View>
 
-        {/* Section: Kanban Board */}
-        <Card style={{ marginBottom: spacing.md }}>
-          <View style={styles.sectionHeader}>
-            <Text style={[typography.titleMedium, { color: colors.onSurface }]}>Kanban Board</Text>
-            <Badge label={`${taskMetrics.total} Tasks`} variant="tertiary" />
-          </View>
-
-          <View style={[styles.taskBreakdownRow, { marginVertical: spacing.md }]}>
-            <View style={[styles.metricPill, { backgroundColor: colors.surfaceVariant, borderColor: colors.outlineVariant }]}>
-              <Text style={[typography.labelMedium, { color: colors.onSurfaceVariant }]}>TODO</Text>
-              <Text style={[typography.titleMedium, { color: colors.onSurface, fontWeight: '700' }]}>
-                {taskMetrics.todo}
+            {/* Progress Bar Section */}
+            <View style={[styles.progressSection, { marginTop: spacing.md }]}>
+              <View style={styles.progressLabelRow}>
+                <Text style={[typography.label, { color: colors.textMuted }]}>PROJECT PROGRESS</Text>
+                <Text style={[typography.label, { color: colors.primary, fontWeight: '700' }]}>
+                  {progressPercent}%
+                </Text>
+              </View>
+              <View style={[styles.progressBarTrack, { backgroundColor: colors.surfaceMuted }]}>
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    {
+                      width: `${progressPercent}%`,
+                      backgroundColor: colors.primary,
+                      borderRadius: borderRadius.pill,
+                    },
+                  ]}
+                />
+              </View>
+              <Text style={[typography.bodySmall, { color: colors.textMuted, marginTop: 4 }]}>
+                {taskMetrics.done} completed • {taskMetrics.inProgress} active • {taskMetrics.testing} testing
               </Text>
             </View>
-            <View style={[styles.metricPill, { backgroundColor: colors.surfaceVariant, borderColor: colors.outlineVariant }]}>
-              <Text style={[typography.labelMedium, { color: colors.primary }]}>IN PROGRESS</Text>
-              <Text style={[typography.titleMedium, { color: colors.primary, fontWeight: '700' }]}>
-                {taskMetrics.inProgress}
-              </Text>
-            </View>
-            <View style={[styles.metricPill, { backgroundColor: colors.surfaceVariant, borderColor: colors.outlineVariant }]}>
-              <Text style={[typography.labelMedium, { color: colors.secondary }]}>TESTING</Text>
-              <Text style={[typography.titleMedium, { color: colors.secondary, fontWeight: '700' }]}>
-                {taskMetrics.testing}
-              </Text>
-            </View>
-            <View style={[styles.metricPill, { backgroundColor: colors.surfaceVariant, borderColor: colors.outlineVariant }]}>
-              <Text style={[typography.labelMedium, { color: colors.tertiary }]}>DONE</Text>
-              <Text style={[typography.titleMedium, { color: colors.tertiary, fontWeight: '700' }]}>
-                {taskMetrics.done}
-              </Text>
-            </View>
-          </View>
+          </Card>
 
-          <Button
-            title="Open Kanban Board"
-            variant="primary"
-            onPress={() =>
-              navigation?.navigate('Kanban', {
-                projectId,
-                projectTitle,
-              })
-            }
-          />
-        </Card>
-
-        {/* Section: Team Chat */}
-        <Card style={{ marginBottom: spacing.md }}>
-          <View style={styles.sectionHeader}>
-            <Text style={[typography.titleMedium, { color: colors.onSurface }]}>Team Chat</Text>
-            <Badge label={`${chatMetrics.totalMessages} Messages`} variant="secondary" />
-          </View>
-
-          {chatMetrics.lastMessage ? (
-            <View
-              style={[
-                styles.lastMessageBox,
-                {
-                  backgroundColor: colors.surfaceVariant,
-                  borderColor: colors.outlineVariant,
-                  borderRadius: borderRadius.md,
-                  padding: spacing.sm,
-                  marginVertical: spacing.sm,
-                },
-              ]}
-            >
-              <Text style={[typography.labelMedium, { color: colors.primary, fontWeight: '600' }]}>
-                {chatMetrics.lastMessage.sender?.profile?.fullName || chatMetrics.lastMessage.sender?.email || 'Teammate'}
-              </Text>
-              <Text style={[typography.bodyMedium, { color: colors.onSurface, marginTop: 2 }]} numberOfLines={2}>
-                {chatMetrics.lastMessage.content}
-              </Text>
+          {/* Section: Kanban Board Cockpit */}
+          <Card style={{ marginBottom: spacing.md }}>
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={[typography.h3, { color: colors.text }]}>Kanban Board</Text>
+                <Text style={[typography.bodySmall, { color: colors.textMuted }]}>
+                  Real-time project task workflow
+                </Text>
+              </View>
+              <Badge label={`${taskMetrics.total} Tasks`} variant="tertiary" />
             </View>
-          ) : (
-            <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginVertical: spacing.sm }]}>
-              No messages exchanged yet. Start collaborating with your team!
+
+            <View style={[styles.taskBreakdownRow, { marginVertical: spacing.md }]}>
+              <View style={[styles.metricPill, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
+                <Text style={[typography.label, { color: colors.textMuted }]}>TODO</Text>
+                <Text style={[typography.h3, { color: colors.text, fontWeight: '700', marginTop: 2 }]}>
+                  {taskMetrics.todo}
+                </Text>
+              </View>
+              <View style={[styles.metricPill, { backgroundColor: colors.primarySoft, borderColor: colors.border }]}>
+                <Text style={[typography.label, { color: colors.primary }]}>ACTIVE</Text>
+                <Text style={[typography.h3, { color: colors.primary, fontWeight: '700', marginTop: 2 }]}>
+                  {taskMetrics.inProgress}
+                </Text>
+              </View>
+              <View style={[styles.metricPill, { backgroundColor: colors.secondarySoft, borderColor: colors.border }]}>
+                <Text style={[typography.label, { color: colors.secondary }]}>TEST</Text>
+                <Text style={[typography.h3, { color: colors.secondary, fontWeight: '700', marginTop: 2 }]}>
+                  {taskMetrics.testing}
+                </Text>
+              </View>
+              <View style={[styles.metricPill, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
+                <Text style={[typography.label, { color: colors.textMuted }]}>DONE</Text>
+                <Text style={[typography.h3, { color: colors.text, fontWeight: '700', marginTop: 2 }]}>
+                  {taskMetrics.done}
+                </Text>
+              </View>
+            </View>
+
+            <Button
+              title="Open Kanban Board"
+              variant="primary"
+              onPress={() =>
+                navigation?.navigate('Kanban', {
+                  projectId,
+                  projectTitle,
+                })
+              }
+            />
+          </Card>
+
+          {/* Section: Team Chat */}
+          <Card style={{ marginBottom: spacing.md }}>
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={[typography.h3, { color: colors.text }]}>Team Chat</Text>
+                <Text style={[typography.bodySmall, { color: colors.textMuted }]}>
+                  Live team communication
+                </Text>
+              </View>
+              <Badge label={`${chatMetrics.totalMessages} Messages`} variant="secondary" />
+            </View>
+
+            {chatMetrics.lastMessage ? (
+              <View
+                style={[
+                  styles.lastMessageBox,
+                  {
+                    backgroundColor: colors.surfaceMuted,
+                    borderColor: colors.border,
+                    borderRadius: borderRadius.md,
+                    padding: spacing.md,
+                    marginVertical: spacing.md,
+                  },
+                ]}
+              >
+                <Text style={[typography.label, { color: colors.primary, fontWeight: '700' }]}>
+                  {chatMetrics.lastMessage.sender?.profile?.fullName ||
+                    chatMetrics.lastMessage.sender?.email ||
+                    'Teammate'}
+                </Text>
+                <Text style={[typography.body, { color: colors.text, marginTop: 4 }]} numberOfLines={2}>
+                  {chatMetrics.lastMessage.content}
+                </Text>
+              </View>
+            ) : (
+              <Text style={[typography.body, { color: colors.textMuted, marginVertical: spacing.md }]}>
+                No messages exchanged yet. Start collaborating with your team!
+              </Text>
+            )}
+
+            <Button
+              title="Open Team Chat"
+              variant="secondary"
+              onPress={() =>
+                navigation?.navigate('Chat', {
+                  projectId,
+                  projectTitle,
+                })
+              }
+            />
+          </Card>
+
+          {/* Section: Team Members */}
+          <Card style={{ marginBottom: spacing.md }}>
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={[typography.h3, { color: colors.text }]}>Project Members</Text>
+                <Text style={[typography.bodySmall, { color: colors.textMuted }]}>
+                  Confirmed team contributors
+                </Text>
+              </View>
+              <Badge label={`${memberCount} Confirmed`} variant="tertiary" />
+            </View>
+
+            <Text style={[typography.body, { color: colors.textMuted, marginVertical: spacing.sm }]}>
+              Collaborators currently assigned to this project workspace.
             </Text>
-          )}
 
-          <Button
-            title="Open Team Chat"
-            variant="secondary"
-            onPress={() =>
-              navigation?.navigate('Chat', {
-                projectId,
-                projectTitle,
-              })
-            }
-          />
-        </Card>
-
-        {/* Section: Team Members */}
-        <Card style={{ marginBottom: spacing.md }}>
-          <View style={styles.sectionHeader}>
-            <Text style={[typography.titleMedium, { color: colors.onSurface }]}>Project Members</Text>
-            <Badge label={`${memberCount} Confirmed`} variant="tertiary" />
-          </View>
-
-          <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginVertical: spacing.sm }]}>
-            Collaborators currently assigned to this project workspace.
-          </Text>
-
-          <Button
-            title="View & Manage Members"
-            variant="outline"
-            onPress={() =>
-              navigation?.navigate('Members', {
-                projectId,
-                projectTitle,
-              })
-            }
-          />
-        </Card>
-      </ScrollView>
-    </StateWrapper>
+            <Button
+              title="View & Manage Members"
+              variant="outline"
+              onPress={() =>
+                navigation?.navigate('Members', {
+                  projectId,
+                  projectTitle,
+                })
+              }
+            />
+          </Card>
+        </ScrollView>
+      </StateWrapper>
+    </View>
   );
 };
 
@@ -245,10 +343,51 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  tabBar: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+  },
+  tabItem: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabText: {
+    fontWeight: '500',
+    fontSize: 13,
+  },
+  tabTextActive: {
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  cockpitCard: {
+    padding: 16,
+  },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+  },
+  projectTitleText: {
+    letterSpacing: -0.2,
+  },
+  progressSection: {
+    marginTop: 10,
+  },
+  progressLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  progressBarTrack: {
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -258,14 +397,15 @@ const styles = StyleSheet.create({
   taskBreakdownRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 8,
   },
   metricPill: {
     flex: 1,
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 8,
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginHorizontal: 3,
   },
   lastMessageBox: {
     borderWidth: 1,

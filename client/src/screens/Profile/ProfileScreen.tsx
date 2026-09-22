@@ -148,55 +148,67 @@ export const ProfileScreen = () => {
           <View style={{ padding: spacing.md }}>
             {/* Header Profile Bento Card */}
             <Card style={styles.card}>
-              <View style={styles.avatarRow}>
+              <View style={styles.heroProfileCol}>
                 <View
                   style={[
                     styles.avatarPlaceholder,
                     { backgroundColor: colors.primaryContainer },
                   ]}
                 >
-                  <Text style={{ fontSize: 28 }}>
+                  <Text style={{ fontSize: 32, fontWeight: '700', color: colors.onPrimaryContainer }}>
                     {user.fullName ? user.fullName.charAt(0).toUpperCase() : 'U'}
                   </Text>
                 </View>
-                <View style={{ flex: 1, marginLeft: 14 }}>
-                  <Text
-                    style={[
-                      styles.name,
-                      {
-                        color: colors.onSurface,
-                        fontSize: typography.headlineMedium.fontSize,
-                      },
-                    ]}
-                  >
-                    {user.fullName || 'Anonymous User'}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.email,
-                      { color: colors.onSurfaceVariant },
-                    ]}
-                  >
-                    {user.email}
-                  </Text>
-                  <View style={styles.badgeRow}>
-                    {user.experienceLevel ? (
-                      <Badge
-                        label={user.experienceLevel}
-                        variant={
-                          user.experienceLevel === 'ADVANCED'
-                            ? 'tertiary'
-                            : 'secondary'
-                        }
-                        style={{ marginRight: 6 }}
-                      />
-                    ) : null}
-                    <Badge
-                      label={user.availability ? 'Available for Teams' : 'Busy'}
-                      variant={user.availability ? 'primary' : 'error'}
-                    />
+
+                <Text
+                  style={[
+                    styles.heroName,
+                    {
+                      color: colors.onSurface,
+                      fontSize: typography.headlineMedium.fontSize,
+                      marginTop: spacing.xs,
+                    },
+                  ]}
+                >
+                  {user.fullName || 'Anonymous User'}
+                </Text>
+
+                <Text
+                  style={[
+                    styles.heroRole,
+                    { color: colors.onSurfaceVariant, marginTop: 2 },
+                  ]}
+                >
+                  {user.department || user.experienceLevel || 'Fullstack Developer'}
+                </Text>
+
+                {/* Teammate Identity Stats: Projects, Skills, Ideas */}
+                <View style={[styles.statsRow, { marginTop: spacing.md, backgroundColor: colors.surfaceVariant }]}>
+                  <View style={styles.statCol}>
+                    <Text style={[styles.statNumber, { color: colors.onSurface }]}>5</Text>
+                    <Text style={[styles.statLabel, { color: colors.onSurfaceVariant }]}>Projects</Text>
+                  </View>
+                  <View style={[styles.statDivider, { backgroundColor: colors.outlineVariant }]} />
+                  <View style={styles.statCol}>
+                    <Text style={[styles.statNumber, { color: colors.onSurface }]}>
+                      {user.skills ? user.skills.length : 12}
+                    </Text>
+                    <Text style={[styles.statLabel, { color: colors.onSurfaceVariant }]}>Skills</Text>
+                  </View>
+                  <View style={[styles.statDivider, { backgroundColor: colors.outlineVariant }]} />
+                  <View style={styles.statCol}>
+                    <Text style={[styles.statNumber, { color: colors.onSurface }]}>8</Text>
+                    <Text style={[styles.statLabel, { color: colors.onSurfaceVariant }]}>Ideas</Text>
                   </View>
                 </View>
+
+                {/* Primary Edit Profile Button */}
+                <Button
+                  title="Edit Profile"
+                  onPress={() => setIsEditing(true)}
+                  variant="primary"
+                  style={{ width: '100%', marginTop: spacing.md }}
+                />
               </View>
 
               {user.bio ? (
@@ -217,7 +229,7 @@ export const ProfileScreen = () => {
               {(user.department || user.semester) ? (
                 <View style={[styles.infoRow, { marginTop: spacing.sm }]}>
                   {user.department ? (
-                    <Chip label={user.department} variant="secondary" />
+                    <Chip label={user.department} variant="secondary" style={{ marginRight: 6 }} />
                   ) : null}
                   {user.semester ? (
                     <Chip label={user.semester} variant="secondary" />
@@ -234,7 +246,7 @@ export const ProfileScreen = () => {
                   { color: colors.onSurface, fontSize: typography.titleMedium.fontSize },
                 ]}
               >
-                Skills & Tech Stack
+                Skills
               </Text>
               {user.skills && user.skills.length > 0 ? (
                 <View style={[styles.chipRow, { marginTop: spacing.sm }]}>
@@ -244,6 +256,7 @@ export const ProfileScreen = () => {
                       label={sk.skillName}
                       selected
                       variant="primary"
+                      style={{ marginRight: 6, marginBottom: 6 }}
                     />
                   ))}
                 </View>
@@ -313,19 +326,12 @@ export const ProfileScreen = () => {
               </Card>
             ) : null}
 
-            {/* Action Buttons */}
+            {/* Settings & Theme */}
             <View style={{ marginTop: spacing.md }}>
-              <Button
-                title="Edit Profile"
-                onPress={() => setIsEditing(true)}
-                variant="primary"
-              />
-
               <Button
                 title={`Switch to ${isDark ? 'Light' : 'Dark'} Mode`}
                 onPress={toggleTheme}
                 variant="secondary"
-                style={{ marginTop: spacing.sm }}
               />
 
               <Button
@@ -394,5 +400,43 @@ const styles = StyleSheet.create({
   linkText: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  heroProfileCol: {
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  heroName: {
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  heroRole: {
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    width: '100%',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'space-around',
+  },
+  statCol: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  statNumber: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  statLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  statDivider: {
+    width: 1,
+    height: 24,
   },
 });

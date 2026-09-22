@@ -23,6 +23,7 @@ export interface StateWrapperProps {
   errorMessage?: string;
   errorCode?: string;
   onRetry?: () => void;
+  retryActionLabel?: string;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -36,6 +37,7 @@ export const StateWrapper: React.FC<StateWrapperProps> = ({
   errorMessage = 'An error occurred while loading data.',
   errorCode,
   onRetry,
+  retryActionLabel = 'Try Again',
   style,
 }) => {
   const { colors, typography, spacing } = useTheme();
@@ -114,14 +116,17 @@ export const StateWrapper: React.FC<StateWrapperProps> = ({
 
   if (state === 'empty') {
     return (
-      <View style={[styles.centeredContainer, style]}>
+      <View
+        accessibilityRole="summary"
+        style={[styles.centeredContainer, style]}
+      >
         <View
           style={[
             styles.iconPlaceholder,
             { backgroundColor: colors.primaryContainer },
           ]}
         >
-          <Text style={{ fontSize: 24, fontWeight: '700' }}>?</Text>
+          <Text style={{ fontSize: 26, fontWeight: '700', color: colors.primary }}>✦</Text>
         </View>
         <Text
           style={[
@@ -159,7 +164,10 @@ export const StateWrapper: React.FC<StateWrapperProps> = ({
 
   if (state === 'error') {
     return (
-      <View style={[styles.centeredContainer, style]}>
+      <View
+        accessibilityRole="alert"
+        style={[styles.centeredContainer, style]}
+      >
         <View
           style={[
             styles.iconPlaceholder,
@@ -178,7 +186,7 @@ export const StateWrapper: React.FC<StateWrapperProps> = ({
             },
           ]}
         >
-          {errorCode ? `Error: ${errorCode}` : 'Something went wrong'}
+          {errorCode ? `Error: ${errorCode}` : "We couldn't load this content"}
         </Text>
         <Text
           style={[
@@ -193,7 +201,7 @@ export const StateWrapper: React.FC<StateWrapperProps> = ({
         </Text>
         {onRetry && (
           <Button
-            title="Retry"
+            title={retryActionLabel}
             onPress={onRetry}
             variant="outline"
             style={{ marginTop: spacing.md }}

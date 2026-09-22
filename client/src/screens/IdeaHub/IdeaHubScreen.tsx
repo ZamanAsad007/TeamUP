@@ -73,10 +73,15 @@ const DEFAULT_IDEAS: ProjectIdea[] = [
   },
 ];
 
-export const IdeaHubScreen: React.FC = () => {
+export interface IdeaHubScreenProps {
+  navigation?: any;
+}
+
+export const IdeaHubScreen: React.FC<IdeaHubScreenProps> = ({ navigation }) => {
   const { colors, typography, spacing } = useTheme();
 
   const [activeTab, setActiveTab] = useState<'generator' | 'feed'>('generator');
+  const [feedSort, setFeedSort] = useState<'Popular' | 'New' | 'Following'>('Popular');
 
   // Generator Form State
   const [selectedDomain, setSelectedDomain] = useState<string>('Fintech');
@@ -95,6 +100,16 @@ export const IdeaHubScreen: React.FC = () => {
   const [feedState, setFeedState] = useState<ScreenState>('loading');
   const [feedFilterDomain, setFeedFilterDomain] = useState<string>('All');
   const [refreshing, setRefreshing] = useState<boolean>(false);
+
+  const handleTurnIntoProject = (idea: ProjectIdea) => {
+    if (navigation && typeof navigation.navigate === 'function') {
+      try {
+        navigation.navigate('CreateProject', { prefill: idea });
+      } catch {
+        navigation.navigate('Create', { screen: 'CreateProject', params: { prefill: idea } });
+      }
+    }
+  };
 
   const fetchFeedIdeas = useCallback(async () => {
     setFeedState('loading');
@@ -475,6 +490,7 @@ export const IdeaHubScreen: React.FC = () => {
                   idea={generatedIdea}
                   isGenerated
                   onSaveToggle={handleToggleSave}
+                  onTurnIntoProject={handleTurnIntoProject}
                 />
               </View>
             )}
@@ -482,7 +498,35 @@ export const IdeaHubScreen: React.FC = () => {
         ) : (
           /* Idea Hub Feed Tab */
           <View style={{ marginTop: spacing.md }}>
-            {/* Filter Pills */}
+            <View style={{ marginBottom: spacing.sm }}>
+              <Text
+                style={[
+                  styles.feedHeading,
+                  { color: colors.onSurface, fontSize: typography.titleMedium.fontSize },
+                ]}
+              >
+                Ideas worth building
+              </Text>
+              <Text style={{ color: colors.onSurfaceVariant, fontSize: 13, marginTop: 2 }}>
+                Find inspiration for your next project.
+              </Text>
+            </View>
+
+            {/* Discovery Sort Chips: Popular, New, Following */}
+            <View style={[styles.filterSortRow, { marginBottom: spacing.xs }]}>
+              {(['Popular', 'New', 'Following'] as const).map((sort) => (
+                <Chip
+                  key={sort}
+                  label={sort}
+                  selected={feedSort === sort}
+                  onPress={() => setFeedSort(sort)}
+                  variant={feedSort === sort ? 'primary' : 'secondary'}
+                  style={{ marginRight: 6 }}
+                />
+              ))}
+            </View>
+
+            {/* Domain Filter Pills */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing.sm }}>
               {['All', 'Education', 'IoT', 'Fintech', 'Healthcare', 'AI & ML'].map((d) => (
                 <Chip
@@ -491,6 +535,7 @@ export const IdeaHubScreen: React.FC = () => {
                   selected={feedFilterDomain === d}
                   onPress={() => setFeedFilterDomain(d)}
                   variant="primary"
+                  style={{ marginRight: 6 }}
                 />
               ))}
             </ScrollView>
@@ -508,6 +553,7 @@ export const IdeaHubScreen: React.FC = () => {
                   key={idea.id}
                   idea={idea}
                   onSaveToggle={handleToggleSave}
+                  onTurnIntoProject={handleTurnIntoProject}
                 />
               ))}
             </StateWrapper>
@@ -593,5 +639,13 @@ const styles = StyleSheet.create({
   resultHeader: {
     fontWeight: '700',
     marginTop: 8,
+  },
+  feedHeading: {
+    fontWeight: '700',
+  },
+  filterSortRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
   },
 });

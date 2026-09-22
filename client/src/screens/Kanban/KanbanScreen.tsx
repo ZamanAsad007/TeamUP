@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../theme/ThemeContext';
+import { AppHeader } from '../../components/AppHeader';
 import { Card } from '../../components/Card';
 import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
@@ -37,22 +38,22 @@ const COLUMNS: { id: TaskStatus; label: string; badgeVariant: 'primary' | 'secon
   { id: 'DONE', label: 'Done', badgeVariant: 'secondary' },
 ];
 
-export const KanbanScreen: React.FC<KanbanScreenProps> = ({ route }) => {
+export const KanbanScreen: React.FC<KanbanScreenProps> = ({ route, navigation }) => {
   const { colors, typography, spacing, borderRadius } = useTheme();
   const projectId = route?.params?.projectId || '';
+  const projectTitle = route?.params?.projectTitle || 'Tasks';
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [screenState, setScreenState] = useState<ScreenState>('loading');
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
   const [refreshing, setRefreshing] = useState(false);
 
-  // Selected column on mobile view or active tab
+  // Selected column on mobile view
   const [activeColumn, setActiveColumn] = useState<TaskStatus>('TODO');
 
   // Task Modal (View / Edit / Create)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
 
   // Form State
@@ -111,7 +112,6 @@ export const KanbanScreen: React.FC<KanbanScreenProps> = ({ route }) => {
   const handleMoveTask = async (taskId: string, targetStatus: TaskStatus) => {
     triggerHaptic();
 
-    // Snapshot current tasks for rollback
     const previousTasks = [...tasks];
     const taskIndex = tasks.findIndex((t) => t.id === taskId);
     if (taskIndex === -1) return;
@@ -119,7 +119,6 @@ export const KanbanScreen: React.FC<KanbanScreenProps> = ({ route }) => {
     const currentTask = tasks[taskIndex];
     if (currentTask.status === targetStatus) return;
 
-    // Optimistically update
     const updatedTask = { ...currentTask, status: targetStatus };
     const optimisticTasks = [...tasks];
     optimisticTasks[taskIndex] = updatedTask;
@@ -128,7 +127,6 @@ export const KanbanScreen: React.FC<KanbanScreenProps> = ({ route }) => {
     try {
       await taskService.updateTask(projectId, taskId, { status: targetStatus });
     } catch (err: any) {
-      // Rollback on failure
       setTasks(previousTasks);
       Alert.alert('Status Update Failed', err?.message || 'Task status could not be updated. Rolling back.');
     }
@@ -136,7 +134,6 @@ export const KanbanScreen: React.FC<KanbanScreenProps> = ({ route }) => {
 
   const openCreateModal = () => {
     setIsCreating(true);
-    setIsEditing(false);
     setSelectedTask(null);
     setFormTitle('');
     setFormDescription('');
@@ -148,7 +145,6 @@ export const KanbanScreen: React.FC<KanbanScreenProps> = ({ route }) => {
   const openDetailModal = (task: Task) => {
     setSelectedTask(task);
     setIsCreating(false);
-    setIsEditing(false);
     setFormTitle(task.title);
     setFormDescription(task.description || '');
     setFormStatus(task.status);
@@ -191,7 +187,7 @@ export const KanbanScreen: React.FC<KanbanScreenProps> = ({ route }) => {
     }
   };
 
-  const getPriorityColor = (priority: TaskPriority) => {
+  const getPriorityVariant = (priority: TaskPriority) => {
     switch (priority) {
       case 'HIGH':
         return 'error';
@@ -199,7 +195,7 @@ export const KanbanScreen: React.FC<KanbanScreenProps> = ({ route }) => {
         return 'secondary';
       case 'MEDIUM':
       default:
-        return 'primary';
+        return 'warning';
     }
   };
 
@@ -216,22 +212,29 @@ export const KanbanScreen: React.FC<KanbanScreenProps> = ({ route }) => {
         onPress={() => openDetailModal(task)}
       >
         <View style={styles.taskCardHeader}>
-          <Text style={[typography.titleMedium, { color: colors.onSurface, flex: 1, marginRight: spacing.xs }]} numberOfLines={2}>
+          <Text style={[typography.h3, { color: colors.text, flex: 1, marginRight: spacing.xs }]} numberOfLines={2}>
             {task.title}
           </Text>
-          <Badge label={task.priority} variant={getPriorityColor(task.priority)} />
+          <Badge label={task.priority} variant={getPriorityVariant(task.priority)} />
         </View>
 
         {task.description ? (
-          <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginTop: spacing.xs }]} numberOfLines={2}>
+          <Text style={[typography.bodySmall, { color: colors.textMuted, marginTop: 4 }]} numberOfLines={2}>
             {task.description}
           </Text>
         ) : null}
 
         {task.assignee && (
-          <Text style={[typography.labelMedium, { color: colors.primary, marginTop: spacing.xs }]}>
-            Assigned: {task.assignee.profile?.fullName || task.assignee.email}
-          </Text>
+          <View style={[styles.assigneeRow, { marginTop: spacing.sm }]}>
+            <View style={[styles.assigneeAvatar, { backgroundColor: colors.primarySoft }]}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>
+                {(task.assignee.profile?.fullName || task.assignee.email || 'A').charAt(0).toUpperCase()}
+              </Text>
+            </View>
+            <Text style={[typography.bodySmall, { color: colors.textMuted, marginLeft: 6 }]}>
+              {task.assignee.profile?.fullName || task.assignee.email}
+            </Text>
+          </View>
         )}
 
         {/* Quick Transition Buttons */}
@@ -241,7 +244,7 @@ export const KanbanScreen: React.FC<KanbanScreenProps> = ({ route }) => {
               title="Start →"
               variant="primary"
               onPress={() => handleMoveTask(task.id, 'IN_PROGRESS')}
-              style={{ minHeight: 32, paddingVertical: 4 }}
+              size="sm"
             />
           )}
           {isInProgress && (
@@ -250,13 +253,14 @@ export const KanbanScreen: React.FC<KanbanScreenProps> = ({ route }) => {
                 title="← To Do"
                 variant="outline"
                 onPress={() => handleMoveTask(task.id, 'TODO')}
-                style={{ minHeight: 32, paddingVertical: 4, marginRight: spacing.xs }}
+                size="sm"
+                style={{ marginRight: spacing.xs }}
               />
               <Button
                 title="Test →"
                 variant="secondary"
                 onPress={() => handleMoveTask(task.id, 'TESTING')}
-                style={{ minHeight: 32, paddingVertical: 4 }}
+                size="sm"
               />
             </>
           )}
@@ -266,13 +270,14 @@ export const KanbanScreen: React.FC<KanbanScreenProps> = ({ route }) => {
                 title="← Bounce"
                 variant="outline"
                 onPress={() => handleMoveTask(task.id, 'IN_PROGRESS')}
-                style={{ minHeight: 32, paddingVertical: 4, marginRight: spacing.xs }}
+                size="sm"
+                style={{ marginRight: spacing.xs }}
               />
               <Button
                 title="Complete ✓"
                 variant="primary"
                 onPress={() => handleMoveTask(task.id, 'DONE')}
-                style={{ minHeight: 32, paddingVertical: 4 }}
+                size="sm"
               />
             </>
           )}
@@ -281,7 +286,7 @@ export const KanbanScreen: React.FC<KanbanScreenProps> = ({ route }) => {
               title="Reopen ↺"
               variant="outline"
               onPress={() => handleMoveTask(task.id, 'IN_PROGRESS')}
-              style={{ minHeight: 32, paddingVertical: 4 }}
+              size="sm"
             />
           )}
         </View>
@@ -293,15 +298,32 @@ export const KanbanScreen: React.FC<KanbanScreenProps> = ({ route }) => {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header bar */}
-      <View style={[styles.topBar, { backgroundColor: colors.surface, padding: spacing.md }]}>
+      <AppHeader
+        title="Tasks"
+        subtitle={projectTitle}
+        showBack={true}
+        onBack={() => navigation?.goBack?.()}
+        actions={[
+          {
+            icon: <Text style={{ fontSize: 20 }}>+</Text>,
+            onPress: openCreateModal,
+            accessibilityLabel: 'Add Task',
+          },
+        ]}
+      />
+
+      {/* Column Horizontal Swipeable Tabs */}
+      <View style={[styles.topBar, { backgroundColor: colors.surface, borderBottomColor: colors.border, paddingHorizontal: spacing.screenPadding, paddingTop: 10 }]}>
         <View style={styles.topBarRow}>
-          <Text style={[typography.headlineMedium, { color: colors.onSurface }]}>Kanban Board</Text>
-          <Button title="+ Add Task" variant="primary" onPress={openCreateModal} />
+          <Text style={[typography.h3, { color: colors.text }]}>Kanban Board</Text>
+          <Button title="+ Add Task" variant="primary" onPress={openCreateModal} size="sm" />
         </View>
 
-        {/* Column Tabs */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: spacing.sm }}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingVertical: 10 }}
+        >
           {COLUMNS.map((col) => {
             const count = tasks.filter((t) => t.status === col.id).length;
             const isSelected = activeColumn === col.id;
@@ -311,7 +333,7 @@ export const KanbanScreen: React.FC<KanbanScreenProps> = ({ route }) => {
                 label={`${col.label} (${count})`}
                 selected={isSelected}
                 onPress={() => setActiveColumn(col.id)}
-                style={{ marginRight: spacing.sm }}
+                style={{ marginRight: spacing.xs }}
               />
             );
           })}
@@ -330,7 +352,7 @@ export const KanbanScreen: React.FC<KanbanScreenProps> = ({ route }) => {
       >
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ padding: spacing.md }}
+          contentContainerStyle={{ padding: spacing.screenPadding, paddingBottom: 80 }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -340,16 +362,23 @@ export const KanbanScreen: React.FC<KanbanScreenProps> = ({ route }) => {
           }
         >
           <View style={[styles.columnHeader, { marginBottom: spacing.sm }]}>
-            <Text style={[typography.titleMedium, { color: colors.onSurface }]}>
+            <Text style={[typography.h3, { color: colors.text }]}>
               {COLUMNS.find((c) => c.id === activeColumn)?.label} ({tasksInActiveColumn.length})
             </Text>
           </View>
 
           {tasksInActiveColumn.length === 0 ? (
             <Card style={{ padding: spacing.lg, alignItems: 'center' }}>
-              <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant }]}>
+              <Text style={[typography.body, { color: colors.textMuted }]}>
                 No tasks in this column.
               </Text>
+              <Button
+                title="+ Add Task"
+                variant="outline"
+                onPress={openCreateModal}
+                style={{ marginTop: spacing.md }}
+                size="sm"
+              />
             </Card>
           ) : (
             tasksInActiveColumn.map(renderTaskCard)
@@ -357,11 +386,27 @@ export const KanbanScreen: React.FC<KanbanScreenProps> = ({ route }) => {
         </ScrollView>
       </StateWrapper>
 
-      {/* Task Detail / Edit / Create Modal */}
+      {/* Floating Add Task Button */}
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel="Create Task"
+        style={[
+          styles.fab,
+          {
+            backgroundColor: colors.primary,
+            shadowColor: colors.primary,
+          },
+        ]}
+        onPress={openCreateModal}
+      >
+        <Text style={styles.fabText}>+</Text>
+      </TouchableOpacity>
+
+      {/* Task Modal (Bottom Sheet Style) */}
       <Modal
         visible={isModalVisible}
-        animationType="slide"
         transparent
+        animationType="slide"
         onRequestClose={() => setIsModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
@@ -370,118 +415,114 @@ export const KanbanScreen: React.FC<KanbanScreenProps> = ({ route }) => {
               styles.modalContent,
               {
                 backgroundColor: colors.surface,
-                borderRadius: borderRadius.bento,
-                borderColor: colors.outlineVariant,
+                borderTopLeftRadius: borderRadius.bottomSheet,
+                borderTopRightRadius: borderRadius.bottomSheet,
                 padding: spacing.lg,
               },
             ]}
           >
-            <View style={styles.modalHeader}>
-              <Text style={[typography.titleMedium, { color: colors.onSurface }]}>
-                {isCreating ? 'Create Task' : isEditing ? 'Edit Task' : 'Task Details'}
+            <View style={styles.sheetHandle} />
+
+            <View style={styles.modalHeaderRow}>
+              <Text style={[typography.h2, { color: colors.text }]}>
+                {isCreating ? 'Create Task' : 'Task Details'}
               </Text>
               <TouchableOpacity onPress={() => setIsModalVisible(false)}>
-                <Text style={{ color: colors.onSurfaceVariant, fontSize: 18, fontWeight: '700' }}>✕</Text>
+                <Text style={{ fontSize: 20, color: colors.textMuted }}>✕</Text>
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={{ maxHeight: 400, marginVertical: spacing.md }}>
-              <Text style={[typography.labelMedium, { color: colors.onSurfaceVariant, marginBottom: spacing.xs }]}>
-                Title *
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={[typography.label, { color: colors.textMuted, marginTop: spacing.md, marginBottom: 4 }]}>
+                Task Title *
               </Text>
               <TextInput
                 style={[
                   styles.input,
                   {
-                    backgroundColor: colors.surfaceVariant,
-                    color: colors.onSurface,
-                    borderColor: colors.outlineVariant,
+                    backgroundColor: colors.surfaceMuted,
+                    color: colors.text,
+                    borderColor: colors.border,
                     borderRadius: borderRadius.md,
-                    padding: spacing.sm,
-                    marginBottom: spacing.sm,
+                    padding: spacing.sm + 2,
                   },
                 ]}
                 placeholder="Task title"
-                placeholderTextColor={colors.onSurfaceVariant}
+                placeholderTextColor={colors.textMuted}
                 value={formTitle}
                 onChangeText={setFormTitle}
-                editable={isCreating || isEditing}
               />
 
-              <Text style={[typography.labelMedium, { color: colors.onSurfaceVariant, marginBottom: spacing.xs }]}>
+              <Text style={[typography.label, { color: colors.textMuted, marginTop: spacing.md, marginBottom: 4 }]}>
                 Description
               </Text>
               <TextInput
                 style={[
                   styles.input,
+                  styles.textArea,
                   {
-                    minHeight: 70,
-                    textAlignVertical: 'top',
-                    backgroundColor: colors.surfaceVariant,
-                    color: colors.onSurface,
-                    borderColor: colors.outlineVariant,
+                    backgroundColor: colors.surfaceMuted,
+                    color: colors.text,
+                    borderColor: colors.border,
                     borderRadius: borderRadius.md,
-                    padding: spacing.sm,
-                    marginBottom: spacing.sm,
+                    padding: spacing.sm + 2,
                   },
                 ]}
-                placeholder="Description / acceptance criteria..."
-                placeholderTextColor={colors.onSurfaceVariant}
+                placeholder="Describe acceptance criteria or technical notes..."
+                placeholderTextColor={colors.textMuted}
                 value={formDescription}
                 onChangeText={setFormDescription}
                 multiline
                 numberOfLines={3}
-                editable={isCreating || isEditing}
               />
 
-              <Text style={[typography.labelMedium, { color: colors.onSurfaceVariant, marginBottom: spacing.xs }]}>
-                Status
+              <Text style={[typography.label, { color: colors.textMuted, marginTop: spacing.md, marginBottom: 6 }]}>
+                Column Stage
               </Text>
-              <View style={[styles.chipsRow, { marginBottom: spacing.sm }]}>
+              <View style={styles.chipRow}>
                 {COLUMNS.map((col) => (
                   <Chip
                     key={col.id}
                     label={col.label}
                     selected={formStatus === col.id}
-                    onPress={() => (isCreating || isEditing) && setFormStatus(col.id)}
-                    style={{ marginRight: spacing.xs, marginBottom: spacing.xs }}
+                    onPress={() => setFormStatus(col.id)}
+                    style={{ marginRight: 6 }}
                   />
                 ))}
               </View>
 
-              <Text style={[typography.labelMedium, { color: colors.onSurfaceVariant, marginBottom: spacing.xs }]}>
+              <Text style={[typography.label, { color: colors.textMuted, marginTop: spacing.md, marginBottom: 6 }]}>
                 Priority
               </Text>
-              <View style={[styles.chipsRow, { marginBottom: spacing.md }]}>
+              <View style={styles.chipRow}>
                 {(['LOW', 'MEDIUM', 'HIGH'] as TaskPriority[]).map((p) => (
                   <Chip
                     key={p}
                     label={p}
                     selected={formPriority === p}
-                    onPress={() => (isCreating || isEditing) && setFormPriority(p)}
-                    style={{ marginRight: spacing.xs }}
+                    onPress={() => setFormPriority(p)}
+                    style={{ marginRight: 6 }}
                   />
                 ))}
               </View>
-            </ScrollView>
 
-            <View style={styles.modalActions}>
-              {!isCreating && !isEditing ? (
+              <View style={[styles.modalActionsRow, { marginTop: spacing.xl }]}>
                 <Button
-                  title="Edit Task"
-                  variant="primary"
-                  onPress={() => setIsEditing(true)}
+                  title="Cancel"
+                  variant="outline"
+                  onPress={() => setIsModalVisible(false)}
+                  style={{ flex: 1, marginRight: spacing.sm }}
                 />
-              ) : (
                 <Button
-                  title={formSubmitting ? 'Saving...' : 'Save Task'}
+                  title="Save Task"
                   variant="primary"
                   loading={formSubmitting}
                   disabled={formSubmitting}
                   onPress={handleSaveTask}
+                  style={{ flex: 1.2 }}
                 />
-              )}
-            </View>
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -495,39 +536,79 @@ const styles = StyleSheet.create({
   },
   topBar: {
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.05)',
   },
   topBarRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 8,
   },
   columnHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  taskCard: {},
+  taskCard: {
+    padding: 14,
+  },
   taskCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
+  assigneeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  assigneeAvatar: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   taskCardActions: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    flexWrap: 'wrap',
     alignItems: 'center',
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 24,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 6,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+  },
+  fabText: {
+    color: '#FFFFFF',
+    fontSize: 28,
+    lineHeight: 30,
+    fontWeight: '400',
   },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    padding: 20,
+    justifyContent: 'flex-end',
   },
   modalContent: {
-    borderWidth: 1,
+    maxHeight: '85%',
   },
-  modalHeader: {
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#CBD5E1',
+    alignSelf: 'center',
+    marginBottom: 12,
+  },
+  modalHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -536,11 +617,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     fontSize: 14,
   },
-  chipsRow: {
+  textArea: {
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
   },
-  modalActions: {
-    marginTop: 8,
+  modalActionsRow: {
+    flexDirection: 'row',
+    paddingBottom: 24,
   },
 });

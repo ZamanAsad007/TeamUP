@@ -17,6 +17,7 @@ export interface ProjectIdea {
   teamSize?: string;
   features?: string[];
   likes?: number;
+  views?: number;
   isSaved?: boolean;
 }
 
@@ -24,6 +25,7 @@ export interface IdeaCardProps {
   idea: ProjectIdea;
   onSaveToggle?: (ideaId: string) => void;
   onUseIdea?: (idea: ProjectIdea) => void;
+  onTurnIntoProject?: (idea: ProjectIdea) => void;
   isGenerated?: boolean;
 }
 
@@ -31,6 +33,7 @@ export const IdeaCard: React.FC<IdeaCardProps> = ({
   idea,
   onSaveToggle,
   onUseIdea,
+  onTurnIntoProject,
   isGenerated = false,
 }) => {
   const { colors, typography, spacing } = useTheme();
@@ -44,6 +47,17 @@ export const IdeaCard: React.FC<IdeaCardProps> = ({
       case 'BEGINNER':
       default:
         return 'primary';
+    }
+  };
+
+  const viewsCount = idea.views || 1240;
+  const likesCount = idea.likes || (idea.isSaved ? 343 : 342);
+
+  const handleTurnIntoProject = () => {
+    if (onTurnIntoProject) {
+      onTurnIntoProject(idea);
+    } else if (onUseIdea) {
+      onUseIdea(idea);
     }
   };
 
@@ -95,6 +109,16 @@ export const IdeaCard: React.FC<IdeaCardProps> = ({
       >
         {idea.description}
       </Text>
+
+      {/* Engagement metrics: Views & Likes */}
+      <View style={[styles.metricsRow, { marginTop: spacing.xs }]}>
+        <Text style={[styles.metricsText, { color: colors.onSurfaceVariant }]}>
+          👁 {viewsCount >= 1000 ? `${(viewsCount / 1000).toFixed(1)}k` : viewsCount}
+        </Text>
+        <Text style={[styles.metricsText, { color: colors.onSurfaceVariant, marginLeft: 16 }]}>
+          ♡ {likesCount}
+        </Text>
+      </View>
 
       {/* Estimated Duration & Team Size */}
       {(idea.estimatedDuration || idea.teamSize) && (
@@ -150,7 +174,7 @@ export const IdeaCard: React.FC<IdeaCardProps> = ({
           </Text>
           <View style={[styles.chipRow, { marginTop: 4 }]}>
             {idea.techStack.map((tech) => (
-              <Chip key={tech} label={tech} selected variant="secondary" />
+              <Chip key={tech} label={tech} selected variant="secondary" style={{ marginRight: 6, marginBottom: 4 }} />
             ))}
           </View>
         </View>
@@ -180,15 +204,15 @@ export const IdeaCard: React.FC<IdeaCardProps> = ({
                 fontSize: 13,
               }}
             >
-              {idea.isSaved ? '💡 Saved' : '🤍 Bookmark Idea'}
+              {idea.isSaved ? "✓ I'm Interested" : "I'm Interested"}
             </Text>
           </TouchableOpacity>
         )}
 
-        {onUseIdea && (
+        {(onTurnIntoProject || onUseIdea) && (
           <Button
-            title="Use as Project Base"
-            onPress={() => onUseIdea(idea)}
+            title="Turn into Project"
+            onPress={handleTurnIntoProject}
             variant="primary"
             style={{ flex: 1, marginLeft: 8 }}
           />
@@ -249,5 +273,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  metricsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  metricsText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

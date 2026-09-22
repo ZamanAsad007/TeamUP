@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { useTheme } from '../../theme/ThemeContext';
+import { AppHeader } from '../../components/AppHeader';
 import { Card } from '../../components/Card';
 import { Badge } from '../../components/Badge';
 import { Chip } from '../../components/Chip';
@@ -21,9 +22,17 @@ const DOMAIN_OPTIONS = ['All', 'Fintech', 'Healthcare', 'Education', 'AI & ML', 
 const TECH_OPTIONS = ['All', 'React Native', 'NestJS', 'Python', 'PostgreSQL', 'TypeScript', 'Flutter'];
 const SEMESTER_OPTIONS = ['All', 'Fall 2026', 'Spring 2026', 'Fall 2025'];
 const STATUS_OPTIONS = ['All', 'OPEN', 'IN_PROGRESS', 'COMPLETED'];
+const SEARCH_CATEGORIES = ['Projects', 'People', 'Ideas'];
 
-export const SearchScreen: React.FC = () => {
-  const { colors, typography, spacing } = useTheme();
+export interface SearchScreenProps {
+  navigation?: any;
+}
+
+export const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
+  const { colors, typography, spacing, borderRadius } = useTheme();
+
+  // Search Category
+  const [activeCategory, setActiveCategory] = useState<string>('Projects');
 
   // Search Input & Debounced State
   const [searchInput, setSearchInput] = useState<string>('');
@@ -169,200 +178,237 @@ export const SearchScreen: React.FC = () => {
   };
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-    >
-      <View style={{ padding: spacing.md }}>
-        {/* Header & Search Bar Card */}
-        <Card style={styles.headerCard}>
-          <View style={styles.titleRow}>
-            <Text
-              style={[
-                styles.title,
-                { color: colors.onSurface, fontSize: typography.headlineMedium.fontSize },
-              ]}
-            >
-              Project Search
-            </Text>
-            <Badge label="Feature 12" variant="primary" />
-          </View>
-          <Text
-            style={[
-              styles.subtitle,
-              { color: colors.onSurfaceVariant, marginTop: spacing.xs },
-            ]}
-          >
-            Discover active university projects by keyword, domain, tech stack, and semester.
-          </Text>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <AppHeader
+        title="Project Search"
+        subtitle="Find projects, classmates & skills"
+        showBack={navigation?.canGoBack ? navigation.canGoBack() : false}
+        onBack={() => navigation?.goBack?.()}
+      />
 
-          {/* Debounced Search Bar Input */}
-          <View style={[styles.searchBarRow, { marginTop: spacing.md }]}>
-            <TextInput
-              style={[
-                styles.searchInput,
-                {
-                  color: colors.onSurface,
-                  backgroundColor: colors.surfaceVariant,
-                  borderColor: colors.outlineVariant,
-                },
-              ]}
-              value={searchInput}
-              onChangeText={setSearchInput}
-              placeholder="Search title, description, or domain..."
-              placeholderTextColor={colors.onSurfaceVariant}
-            />
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={{ paddingBottom: 60 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        <View style={{ padding: spacing.screenPadding }}>
+          {/* Header & Search Bar Card */}
+          <Card style={styles.headerCard}>
+            {/* Category Segmented Controls */}
+            <View style={styles.categoryRow}>
+              {SEARCH_CATEGORIES.map((cat) => (
+                <TouchableOpacity
+                  key={cat}
+                  accessibilityRole="button"
+                  onPress={() => setActiveCategory(cat)}
+                  style={[
+                    styles.categoryBtn,
+                    {
+                      backgroundColor: activeCategory === cat ? colors.primary : colors.surfaceMuted,
+                      borderRadius: borderRadius.pill,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={{
+                      color: activeCategory === cat ? '#FFFFFF' : colors.textMuted,
+                      fontWeight: '600',
+                      fontSize: 13,
+                    }}
+                  >
+                    {cat}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
-            {searchInput ? (
+            {/* Debounced Search Bar Input */}
+            <View style={[styles.searchBarRow, { marginTop: spacing.md }]}>
+              <Text style={{ fontSize: 16, marginRight: 8, color: colors.textMuted }}>🔍</Text>
+              <TextInput
+                style={[
+                  styles.searchInput,
+                  {
+                    color: colors.text,
+                    backgroundColor: colors.surfaceMuted,
+                    borderColor: colors.border,
+                    borderRadius: borderRadius.md,
+                  },
+                ]}
+                value={searchInput}
+                onChangeText={setSearchInput}
+                placeholder="Search title, description, or domain..."
+                placeholderTextColor={colors.textMuted}
+              />
+
+              {searchInput ? (
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear search"
+                  style={styles.clearBtn}
+                  onPress={() => setSearchInput('')}
+                >
+                  <Text style={{ color: colors.textMuted, fontSize: 14 }}>✕</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
+            {/* Filter Sheet Toggle Button */}
+            <View style={[styles.filterToggleRow, { marginTop: spacing.md }]}>
               <TouchableOpacity
-                style={styles.clearBtn}
-                onPress={() => setSearchInput('')}
+                accessibilityRole="button"
+                style={[
+                  styles.filterToggleBtn,
+                  {
+                    backgroundColor:
+                      isFilterSheetOpen || activeFilterCount > 0
+                        ? colors.primarySoft
+                        : colors.surfaceMuted,
+                    borderColor: colors.border,
+                    borderRadius: borderRadius.md,
+                  },
+                ]}
+                onPress={() => setIsFilterSheetOpen(!isFilterSheetOpen)}
               >
-                <Text style={{ color: colors.onSurfaceVariant, fontSize: 14 }}>✕</Text>
-              </TouchableOpacity>
-            ) : null}
-          </View>
-
-          {/* Filter Sheet Toggle Button */}
-          <View style={[styles.filterToggleRow, { marginTop: spacing.md }]}>
-            <TouchableOpacity
-              style={[
-                styles.filterToggleBtn,
-                {
-                  backgroundColor: isFilterSheetOpen || activeFilterCount > 0
-                    ? colors.primaryContainer
-                    : colors.surfaceVariant,
-                  borderColor: colors.outlineVariant,
-                },
-              ]}
-              onPress={() => setIsFilterSheetOpen(!isFilterSheetOpen)}
-            >
-              <Text
-                style={{
-                  color: isFilterSheetOpen || activeFilterCount > 0
-                    ? colors.onPrimaryContainer
-                    : colors.onSurfaceVariant,
-                  fontWeight: '600',
-                  fontSize: 14,
-                }}
-              >
-                Filter Sheet {activeFilterCount > 0 ? `(${activeFilterCount})` : ''}
-              </Text>
-            </TouchableOpacity>
-
-            {activeFilterCount > 0 && (
-              <TouchableOpacity onPress={handleResetFilters}>
-                <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 13, marginLeft: 12 }}>
-                  Reset All
+                <Text
+                  style={{
+                    color:
+                      isFilterSheetOpen || activeFilterCount > 0
+                        ? colors.primary
+                        : colors.text,
+                    fontWeight: '600',
+                    fontSize: 14,
+                  }}
+                >
+                  Filter Sheet {activeFilterCount > 0 ? `(${activeFilterCount})` : ''}
                 </Text>
               </TouchableOpacity>
-            )}
-          </View>
 
-          {/* Collapsible Filter Sheet Container */}
-          {isFilterSheetOpen && (
-            <View style={[styles.filterSheet, { backgroundColor: colors.surfaceVariant, marginTop: spacing.md }]}>
-              {/* Filter 1: Domain */}
-              <Text style={[styles.filterLabel, { color: colors.onSurface }]}>
-                Domain:
-              </Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 4 }}>
-                {DOMAIN_OPTIONS.map((d) => (
-                  <Chip
-                    key={d}
-                    label={d}
-                    selected={selectedDomain === d}
-                    onPress={() => setSelectedDomain(d)}
-                    variant="primary"
-                  />
-                ))}
-              </ScrollView>
-
-              {/* Filter 2: Tech Stack */}
-              <Text style={[styles.filterLabel, { color: colors.onSurface, marginTop: spacing.xs }]}>
-                Tech Stack:
-              </Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 4 }}>
-                {TECH_OPTIONS.map((t) => (
-                  <Chip
-                    key={t}
-                    label={t}
-                    selected={selectedTech === t}
-                    onPress={() => setSelectedTech(t)}
-                    variant="secondary"
-                  />
-                ))}
-              </ScrollView>
-
-              {/* Filter 3: Semester */}
-              <Text style={[styles.filterLabel, { color: colors.onSurface, marginTop: spacing.xs }]}>
-                Semester:
-              </Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 4 }}>
-                {SEMESTER_OPTIONS.map((s) => (
-                  <Chip
-                    key={s}
-                    label={s}
-                    selected={selectedSemester === s}
-                    onPress={() => setSelectedSemester(s)}
-                    variant="primary"
-                  />
-                ))}
-              </ScrollView>
-
-              {/* Filter 4: Project Status */}
-              <Text style={[styles.filterLabel, { color: colors.onSurface, marginTop: spacing.xs }]}>
-                Status:
-              </Text>
-              <View style={styles.chipRow}>
-                {STATUS_OPTIONS.map((st) => (
-                  <Chip
-                    key={st}
-                    label={st}
-                    selected={selectedStatus === st}
-                    onPress={() => setSelectedStatus(st)}
-                    variant="tertiary"
-                  />
-                ))}
-              </View>
+              {activeFilterCount > 0 && (
+                <TouchableOpacity onPress={handleResetFilters}>
+                  <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 13, marginLeft: 12 }}>
+                    Reset All
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
-          )}
-        </Card>
 
-        {/* Search Results Content */}
-        <StateWrapper
-          state={screenState}
-          emptyTitle="No Projects Found"
-          emptySubtitle="No projects matching your combined search criteria were found. Try clearing keywords or resetting filters."
-          emptyActionLabel="Reset All Filters"
-          onEmptyAction={handleResetFilters}
-          errorMessage={errorMessage}
-          errorCode={errorCode}
-          onRetry={executeSearch}
-        >
-          <View style={{ marginTop: spacing.md }}>
-            <Text
-              style={[
-                styles.resultsHeader,
-                { color: colors.onSurface, fontSize: typography.titleMedium.fontSize },
-              ]}
-            >
-              Search Results ({projects.length})
-            </Text>
+            {/* Collapsible Filter Sheet Container */}
+            {isFilterSheetOpen && (
+              <View
+                style={[
+                  styles.filterSheet,
+                  {
+                    backgroundColor: colors.surfaceMuted,
+                    borderColor: colors.border,
+                    borderRadius: borderRadius.md,
+                    marginTop: spacing.md,
+                  },
+                ]}
+              >
+                {/* Filter 1: Domain */}
+                <Text style={[styles.filterLabel, { color: colors.text }]}>
+                  Domain:
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 4 }}>
+                  {DOMAIN_OPTIONS.map((d) => (
+                    <Chip
+                      key={d}
+                      label={d}
+                      selected={selectedDomain === d}
+                      onPress={() => setSelectedDomain(d)}
+                      variant="primary"
+                    />
+                  ))}
+                </ScrollView>
 
-            {projects.map((project) => (
-              <ProjectCard
-                key={project.id}
-                project={project}
-                onBookmarkToggle={handleBookmarkToggle}
-              />
-            ))}
-          </View>
-        </StateWrapper>
-      </View>
-    </ScrollView>
+                {/* Filter 2: Tech Stack */}
+                <Text style={[styles.filterLabel, { color: colors.text, marginTop: spacing.xs }]}>
+                  Tech Stack:
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 4 }}>
+                  {TECH_OPTIONS.map((t) => (
+                    <Chip
+                      key={t}
+                      label={t}
+                      selected={selectedTech === t}
+                      onPress={() => setSelectedTech(t)}
+                      variant="secondary"
+                    />
+                  ))}
+                </ScrollView>
+
+                {/* Filter 3: Semester */}
+                <Text style={[styles.filterLabel, { color: colors.text, marginTop: spacing.xs }]}>
+                  Semester:
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 4 }}>
+                  {SEMESTER_OPTIONS.map((s) => (
+                    <Chip
+                      key={s}
+                      label={s}
+                      selected={selectedSemester === s}
+                      onPress={() => setSelectedSemester(s)}
+                      variant="primary"
+                    />
+                  ))}
+                </ScrollView>
+
+                {/* Filter 4: Project Status */}
+                <Text style={[styles.filterLabel, { color: colors.text, marginTop: spacing.xs }]}>
+                  Status:
+                </Text>
+                <View style={styles.chipRow}>
+                  {STATUS_OPTIONS.map((st) => (
+                    <Chip
+                      key={st}
+                      label={st}
+                      selected={selectedStatus === st}
+                      onPress={() => setSelectedStatus(st)}
+                      variant="tertiary"
+                    />
+                  ))}
+                </View>
+              </View>
+            )}
+          </Card>
+
+          {/* Search Results Content */}
+          <StateWrapper
+            state={screenState}
+            emptyTitle="No Projects Found"
+            emptySubtitle="No projects matching your combined search criteria were found. Try clearing keywords or resetting filters."
+            emptyActionLabel="Reset All Filters"
+            onEmptyAction={handleResetFilters}
+            errorMessage={errorMessage}
+            errorCode={errorCode}
+            onRetry={executeSearch}
+          >
+            <View style={{ marginTop: spacing.md }}>
+              <Text
+                style={[
+                  styles.resultsHeader,
+                  { color: colors.text, fontSize: typography.h3.fontSize },
+                ]}
+              >
+                Search Results ({projects.length})
+              </Text>
+
+              {projects.map((project) => (
+                <ProjectCard
+                  key={project.id}
+                  project={project}
+                  onBookmarkToggle={handleBookmarkToggle}
+                  onPress={() => navigation?.navigate?.('ProjectDetail', { projectId: project.id })}
+                />
+              ))}
+            </View>
+          </StateWrapper>
+        </View>
+      </ScrollView>
+    </View>
   );
 };
 
@@ -371,19 +417,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerCard: {
-    padding: 18,
+    padding: 16,
   },
-  titleRow: {
+  categoryRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  categoryBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginRight: 8,
+    minHeight: 36,
+    justifyContent: 'center',
     alignItems: 'center',
-  },
-  title: {
-    fontWeight: '700',
-  },
-  subtitle: {
-    fontSize: 14,
-    lineHeight: 20,
   },
   searchBarRow: {
     flexDirection: 'row',
@@ -394,7 +440,6 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 44,
     borderWidth: 1,
-    borderRadius: 8,
     paddingHorizontal: 12,
     paddingRight: 36,
     fontSize: 14,
@@ -402,7 +447,7 @@ const styles = StyleSheet.create({
   clearBtn: {
     position: 'absolute',
     right: 12,
-    padding: 4,
+    padding: 6,
   },
   filterToggleRow: {
     flexDirection: 'row',
@@ -412,12 +457,13 @@ const styles = StyleSheet.create({
   filterToggleBtn: {
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 8,
     borderWidth: 1,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   filterSheet: {
     padding: 14,
-    borderRadius: 12,
+    borderWidth: 1,
   },
   filterLabel: {
     fontSize: 12,
@@ -430,5 +476,6 @@ const styles = StyleSheet.create({
   },
   resultsHeader: {
     fontWeight: '700',
+    marginBottom: 4,
   },
 });

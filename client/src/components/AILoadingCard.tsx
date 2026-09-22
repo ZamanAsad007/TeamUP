@@ -9,10 +9,9 @@ export const AILoadingCard: React.FC = () => {
   const [stepIndex, setStepIndex] = useState(0);
 
   const steps = [
-    'Connecting to LLM brainstorming engine...',
-    'Analyzing target domain & tech stack requirements...',
-    'Synthesizing unique project features and architecture...',
-    'Structuring team size, duration & difficulty rating...',
+    '✦ Thinking about your interests',
+    '✦ Exploring project possibilities',
+    '○ Creating suggestions',
   ];
 
   useEffect(() => {
@@ -35,7 +34,7 @@ export const AILoadingCard: React.FC = () => {
     // Step message rotation
     const interval = setInterval(() => {
       setStepIndex((prev) => (prev + 1) % steps.length);
-    }, 2200);
+    }, 1800);
 
     return () => clearInterval(interval);
   }, [pulseAnim, steps.length]);
@@ -43,20 +42,30 @@ export const AILoadingCard: React.FC = () => {
   return (
     <Card style={[styles.card, { marginTop: spacing.md }]}>
       <View style={styles.headerRow}>
-        <View style={[styles.badgeSkeleton, { backgroundColor: colors.primaryContainer }]} />
-        <Text style={[styles.aiLabel, { color: colors.primary }]}>
-          🪄 AI Brainstorming in Progress...
+        <Text style={[styles.aiLabel, { color: colors.primary, fontSize: typography.titleMedium.fontSize }]}>
+          Generating ideas...
         </Text>
       </View>
 
-      <Text
-        style={[
-          styles.stepText,
-          { color: colors.onSurface, fontSize: typography.bodyMedium.fontSize },
-        ]}
-      >
-        {steps[stepIndex]}
-      </Text>
+      <View style={{ marginTop: spacing.sm }}>
+        {steps.map((step, idx) => {
+          const isActive = idx === stepIndex;
+          const isDone = idx < stepIndex;
+          return (
+            <View key={step} style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 3 }}>
+              <Text
+                style={{
+                  color: isActive ? colors.primary : isDone ? colors.onSurface : colors.onSurfaceVariant,
+                  fontWeight: isActive ? '700' : '500',
+                  fontSize: 14,
+                }}
+              >
+                {step}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
 
       {/* Idea card geometry skeleton shapes */}
       <Animated.View style={{ opacity: pulseAnim }}>

@@ -10,6 +10,12 @@ import { TabNavigator } from './TabNavigator';
 import { WorkspaceNavigator } from './WorkspaceNavigator';
 import { ProjectDetailScreen } from '../screens/Marketplace/ProjectDetailScreen';
 import { CreateProjectScreen } from '../screens/Marketplace/CreateProjectScreen';
+import { SearchScreen } from '../screens/Search/SearchScreen';
+import { SchedulerScreen } from '../screens/Scheduler/SchedulerScreen';
+import { NotificationsScreen } from '../screens/Notifications/NotificationsScreen';
+import { BookmarksScreen } from '../screens/Bookmarks/BookmarksScreen';
+import { ProfileScreen } from '../screens/Profile/ProfileScreen';
+import { SettingsScreen } from '../screens/Settings/SettingsScreen';
 import { StateWrapper } from '../components/StateWrapper';
 
 export type RootStackParamList = {
@@ -21,6 +27,13 @@ export type RootStackParamList = {
   ProjectDetail: { projectId: string };
   CreateProject: undefined;
   Workspace: { projectId: string; projectTitle?: string };
+  Search: undefined;
+  Scheduler: undefined;
+  Calendar: undefined;
+  Notifications: undefined;
+  Bookmarks: undefined;
+  Profile: undefined;
+  Settings: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -39,9 +52,9 @@ export const RootNavigator = () => {
       primary: colors.primary,
       background: colors.background,
       card: colors.surface,
-      text: colors.onSurface,
-      border: colors.outlineVariant,
-      notification: colors.tertiary,
+      text: colors.text,
+      border: colors.border,
+      notification: colors.accent,
     },
     fonts: {
       regular: { fontFamily: 'System', fontWeight: '400' as const },
@@ -53,7 +66,7 @@ export const RootNavigator = () => {
 
   return (
     <NavigationContainer theme={themeConfig}>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
         {isAuthenticated ? (
           <>
             <Stack.Screen name="MainApp" component={TabNavigator} />
@@ -64,20 +77,24 @@ export const RootNavigator = () => {
                 headerShown: true,
                 title: 'Project Details',
                 headerStyle: { backgroundColor: colors.surface },
-                headerTintColor: colors.onSurface,
+                headerTintColor: colors.text,
               }}
             />
             <Stack.Screen
               name="CreateProject"
               component={CreateProjectScreen}
               options={{
-                headerShown: true,
-                title: 'Create Project',
-                headerStyle: { backgroundColor: colors.surface },
-                headerTintColor: colors.onSurface,
+                headerShown: false,
               }}
             />
             <Stack.Screen name="Workspace" component={WorkspaceNavigator} />
+            <Stack.Screen name="Search" component={SearchScreen} />
+            <Stack.Screen name="Scheduler" component={SchedulerScreen} />
+            <Stack.Screen name="Calendar" component={SchedulerScreen} />
+            <Stack.Screen name="Notifications" component={NotificationsScreen} />
+            <Stack.Screen name="Bookmarks" component={BookmarksScreen} />
+            <Stack.Screen name="Profile" component={ProfileScreen} />
+            <Stack.Screen name="Settings" component={SettingsScreen} />
           </>
         ) : (
           <>

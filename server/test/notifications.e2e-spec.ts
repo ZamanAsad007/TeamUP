@@ -154,7 +154,7 @@ describe('Notification Engine & Expo Push Dispatcher (e2e)', () => {
       }),
       delete: jest.fn(({ where }: any) => {
         const idx = mockNotifications.findIndex((n) => n.id === where.id);
-        let removed = null;
+        let removed: any = null;
         if (idx !== -1) {
           removed = mockNotifications.splice(idx, 1)[0];
         }
