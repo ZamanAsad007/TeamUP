@@ -163,7 +163,7 @@ describe('Bookmarks & Favorites Subsystem (e2e)', () => {
       }),
       delete: jest.fn(({ where }: any) => {
         const idx = mockBookmarks.findIndex((b) => b.id === where.id);
-        let removed = null;
+        let removed: any = null;
         if (idx !== -1) {
           removed = mockBookmarks.splice(idx, 1)[0];
         }

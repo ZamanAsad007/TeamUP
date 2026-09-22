@@ -18,7 +18,7 @@ describe('AiIdeaService', () => {
   };
 
   const mockConfigService = {
-    get: jest.fn((key: string) => {
+    get: jest.fn((key: string): string | null => {
       if (key === 'LLM_API_KEY') return 'your_llm_api_key';
       if (key === 'LLM_CACHE_TTL_HOURS') return '24';
       return null;

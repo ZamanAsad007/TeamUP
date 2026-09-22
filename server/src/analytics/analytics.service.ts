@@ -314,20 +314,28 @@ export class AnalyticsService {
       }),
     ]);
 
-    const timestamps = [
+    const timestamps: Date[] = [
       lastMessage?.createdAt,
       lastTask?.updatedAt,
       lastFile?.createdAt,
-    ].filter(Boolean);
+    ].filter((d): d is Date => Boolean(d));
 
-    return timestamps.length > 0 ? new Date(Math.max(...timestamps.map(d => d.getTime()))) : null;
+    return timestamps.length > 0
+      ? new Date(Math.max(...timestamps.map((d) => d.getTime())))
+      : null;
   }
 
   /**
    * Get daily activity chart data
    */
   private async getDailyActivityChart(projectId: string, days: number) {
-    const activityData = [];
+    const activityData: Array<{
+      date: string;
+      messages: number;
+      tasks: number;
+      files: number;
+      total: number;
+    }> = [];
 
     for (let i = days - 1; i >= 0; i--) {
       const date = new Date();
@@ -412,9 +420,11 @@ export class AnalyticsService {
     });
 
     const now = new Date();
-    const projectAge = Math.floor(
-      (now.getTime() - project.createdAt.getTime()) / (1000 * 60 * 60 * 24),
-    );
+    const projectAge = project?.createdAt
+      ? Math.floor(
+          (now.getTime() - project.createdAt.getTime()) / (1000 * 60 * 60 * 24),
+        )
+      : 0;
 
     const [upcomingDeadlines, completedMilestones, totalEvents] =
       await Promise.all([
@@ -463,7 +473,12 @@ export class AnalyticsService {
   async getTaskVelocity(projectId: string, userId: string, weeks: number = 4) {
     await this.verifyProjectMembership(projectId, userId);
 
-    const velocityData = [];
+    const velocityData: Array<{
+      week: string;
+      weekStart: string;
+      weekEnd: string;
+      tasksCompleted: number;
+    }> = [];
 
     for (let i = weeks - 1; i >= 0; i--) {
       const weekStart = new Date();
