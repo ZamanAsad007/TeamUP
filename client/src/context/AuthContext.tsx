@@ -246,120 +246,85 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (email: string, password: string): Promise<void> => {
-    setIsLoading(true);
-    try {
-      const res = await api.post<any>('/auth/login', {
-        email,
-        password,
-      });
+    const res = await api.post<any>('/auth/login', {
+      email,
+      password,
+    });
 
-      const accessToken = res?.tokens?.accessToken || res?.accessToken;
-      const refreshToken = res?.tokens?.refreshToken || res?.refreshToken;
+    const accessToken = res?.tokens?.accessToken || res?.accessToken;
+    const refreshToken = res?.tokens?.refreshToken || res?.refreshToken;
 
-      if (accessToken) {
-        await tokenStorage.setAccessToken(accessToken);
-        if (refreshToken) {
-          await tokenStorage.setRefreshToken(refreshToken);
-        }
-        setToken(accessToken);
-
-        // Fetch or assign full user profile with normalized user id and email
-        if (res.user) {
-          try {
-            const profile = await api.get<UserProfile>('/profiles/me');
-            setUser(normalizeUserProfile(profile, res.user, email));
-          } catch {
-            setUser(normalizeUserProfile(res.user, null, email));
-          }
-        } else {
-          try {
-            const profile = await api.get<UserProfile>('/profiles/me');
-            setUser(normalizeUserProfile(profile, null, email));
-          } catch {
-            setUser(normalizeUserProfile({ email, fullName: email.split('@')[0] }, null, email));
-          }
-        }
-
-        // Register push notification token
-        await pushNotificationService.registerDevicePushToken();
+    if (accessToken) {
+      await tokenStorage.setAccessToken(accessToken);
+      if (refreshToken) {
+        await tokenStorage.setRefreshToken(refreshToken);
       }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      setToken(accessToken);
 
-  const verifyOtp = async (email: string, code: string): Promise<void> => {
-    setIsLoading(true);
-    try {
-      const res = await api.post<any>('/auth/verify-otp', {
-        email,
-        code,
-      });
-
-      const accessToken = res?.tokens?.accessToken || res?.accessToken;
-      const refreshToken = res?.tokens?.refreshToken || res?.refreshToken;
-
-      if (accessToken) {
-        await tokenStorage.setAccessToken(accessToken);
-        if (refreshToken) {
-          await tokenStorage.setRefreshToken(refreshToken);
-        }
-        setToken(accessToken);
-
-        if (res.user) {
-          try {
-            const profile = await api.get<UserProfile>('/profiles/me');
-            setUser(normalizeUserProfile(profile, res.user, email));
-          } catch {
-            setUser(normalizeUserProfile(res.user, null, email));
-          }
-        } else {
-          try {
-            const profile = await api.get<UserProfile>('/profiles/me');
-            setUser(normalizeUserProfile(profile, null, email));
-          } catch {
-            setUser(normalizeUserProfile({ email, fullName: email.split('@')[0] }, null, email));
-          }
-        }
-
-        await pushNotificationService.registerDevicePushToken();
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const register = async (fullName: string, email: string, password: string): Promise<void> => {
-    setIsLoading(true);
-    try {
-      const res = await api.post<any>('/auth/register', {
-        fullName,
-        email,
-        password,
-      });
-
-      const accessToken = res?.tokens?.accessToken || res?.accessToken;
-      const refreshToken = res?.tokens?.refreshToken || res?.refreshToken;
-
-      if (accessToken) {
-        await tokenStorage.setAccessToken(accessToken);
-        if (refreshToken) {
-          await tokenStorage.setRefreshToken(refreshToken);
-        }
-        setToken(accessToken);
+      // Fetch or assign full user profile with normalized user id and email
+      if (res.user) {
         try {
           const profile = await api.get<UserProfile>('/profiles/me');
           setUser(normalizeUserProfile(profile, res.user, email));
         } catch {
-          setUser(normalizeUserProfile({ ...(res.user || {}), email, fullName }, null, email));
+          setUser(normalizeUserProfile(res.user, null, email));
         }
-
-        // Register push notification token
-        await pushNotificationService.registerDevicePushToken();
+      } else {
+        try {
+          const profile = await api.get<UserProfile>('/profiles/me');
+          setUser(normalizeUserProfile(profile, null, email));
+        } catch {
+          setUser(normalizeUserProfile({ email, fullName: email.split('@')[0] }, null, email));
+        }
       }
-    } finally {
-      setIsLoading(false);
+
+      // Register push notification token
+      await pushNotificationService.registerDevicePushToken();
     }
+  };
+
+  const verifyOtp = async (email: string, code: string): Promise<void> => {
+    const res = await api.post<any>('/auth/verify-otp', {
+      email,
+      code,
+    });
+
+    const accessToken = res?.tokens?.accessToken || res?.accessToken;
+    const refreshToken = res?.tokens?.refreshToken || res?.refreshToken;
+
+    if (accessToken) {
+      await tokenStorage.setAccessToken(accessToken);
+      if (refreshToken) {
+        await tokenStorage.setRefreshToken(refreshToken);
+      }
+      setToken(accessToken);
+
+      if (res.user) {
+        try {
+          const profile = await api.get<UserProfile>('/profiles/me');
+          setUser(normalizeUserProfile(profile, res.user, email));
+        } catch {
+          setUser(normalizeUserProfile(res.user, null, email));
+        }
+      } else {
+        try {
+          const profile = await api.get<UserProfile>('/profiles/me');
+          setUser(normalizeUserProfile(profile, null, email));
+        } catch {
+          setUser(normalizeUserProfile({ email, fullName: email.split('@')[0] }, null, email));
+        }
+      }
+
+      await pushNotificationService.registerDevicePushToken();
+    }
+  };
+
+  const register = async (fullName: string, email: string, password: string): Promise<void> => {
+    await api.post<any>('/auth/register', {
+      fullName,
+      email,
+      password,
+    });
   };
 
   const logout = async (): Promise<void> => {
