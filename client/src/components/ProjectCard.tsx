@@ -5,6 +5,7 @@ import { Card } from './Card';
 import { Badge } from './Badge';
 import { Chip } from './Chip';
 import { Button } from './Button';
+import { Bookmark, User, Users } from 'lucide-react-native';
 
 import * as Haptics from 'expo-haptics';
 import { Platform } from 'react-native';
@@ -89,6 +90,9 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
 
         {onBookmarkToggle && (
           <TouchableOpacity
+            testID="bookmark-button"
+            accessibilityLabel="Bookmark"
+            accessibilityRole="button"
             style={[
               styles.bookmarkBtn,
               {
@@ -99,9 +103,11 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
             ]}
             onPress={handleBookmarkPress}
           >
-            <Text style={{ fontSize: 16 }}>
-              {project.isBookmarked ? '🔖' : '🏷️'}
-            </Text>
+            <Bookmark
+              size={16}
+              color={project.isBookmarked ? colors.primary : colors.onSurfaceVariant}
+              fill={project.isBookmarked ? colors.primary : 'none'}
+            />
           </TouchableOpacity>
         )}
       </View>
@@ -123,20 +129,26 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
       {/* Owner & Member Count */}
       <View style={[styles.metaRow, { marginTop: spacing.xs }]}>
         {project.ownerName && (
-          <Text style={[styles.metaText, { color: colors.onSurfaceVariant }]}>
-            👤 Created by {project.ownerName}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <User size={13} color={colors.onSurfaceVariant} style={{ marginRight: 4 }} />
+            <Text style={[styles.metaText, { color: colors.onSurfaceVariant }]}>
+              Created by {project.ownerName}
+            </Text>
+          </View>
         )}
         {project.memberCount !== undefined && (
-          <Text
-            style={[
-              styles.metaText,
-              { color: colors.onSurfaceVariant, marginLeft: 12 },
-            ]}
-          >
-            👥 {project.memberCount}
-            {project.maxMembers ? `/${project.maxMembers}` : ''} members
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 12 }}>
+            <Users size={13} color={colors.onSurfaceVariant} style={{ marginRight: 4 }} />
+            <Text
+              style={[
+                styles.metaText,
+                { color: colors.onSurfaceVariant },
+              ]}
+            >
+              {project.memberCount}
+              {project.maxMembers ? `/${project.maxMembers}` : ''} members
+            </Text>
+          </View>
         )}
       </View>
 

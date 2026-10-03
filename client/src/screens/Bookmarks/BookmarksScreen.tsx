@@ -19,7 +19,7 @@ import { api } from '../../api/client';
 const SAMPLE_PROJECTS: ProjectListing[] = [
   {
     id: 'proj-101',
-    title: 'TeamUp — Student Partner Finder',
+    title: 'TeamUp - Student Partner Finder',
     description: 'Unified cross-platform React Native app with NestJS backend for matching university teammates using weighted skill scores.',
     domain: 'Education',
     semester: 'Fall 2026',
@@ -70,20 +70,7 @@ export const BookmarksScreen: React.FC<BookmarksScreenProps> = ({
     setErrorCode(undefined);
 
     try {
-      const bookmarkedIds = await bookmarkService.getBookmarkedIds();
-
-      let allProjects: ProjectListing[] = [];
-      try {
-        const remoteData = await api.get<ProjectListing[]>('/projects');
-        allProjects = Array.isArray(remoteData) ? remoteData : SAMPLE_PROJECTS;
-      } catch {
-        allProjects = SAMPLE_PROJECTS;
-      }
-
-      const savedList = allProjects
-        .filter((p) => bookmarkedIds.includes(p.id))
-        .map((p) => ({ ...p, isBookmarked: true }));
-
+      const savedList = await bookmarkService.getBookmarkedProjects();
       setBookmarkedProjects(savedList);
       setScreenState(savedList.length === 0 ? 'empty' : 'populated');
     } catch (err: any) {
@@ -99,21 +86,7 @@ export const BookmarksScreen: React.FC<BookmarksScreenProps> = ({
     async function init() {
       setScreenState('loading');
       try {
-        const bookmarkedIds = await bookmarkService.getBookmarkedIds();
-        if (!isMounted) return;
-
-        let allProjects: ProjectListing[] = [];
-        try {
-          const remoteData = await api.get<ProjectListing[]>('/projects');
-          allProjects = Array.isArray(remoteData) ? remoteData : SAMPLE_PROJECTS;
-        } catch {
-          allProjects = SAMPLE_PROJECTS;
-        }
-
-        const savedList = allProjects
-          .filter((p) => bookmarkedIds.includes(p.id))
-          .map((p) => ({ ...p, isBookmarked: true }));
-
+        const savedList = await bookmarkService.getBookmarkedProjects();
         if (!isMounted) return;
         setBookmarkedProjects(savedList);
         setScreenState(savedList.length === 0 ? 'empty' : 'populated');
@@ -194,7 +167,6 @@ export const BookmarksScreen: React.FC<BookmarksScreenProps> = ({
             >
               Saved Bookmarks
             </Text>
-            <Badge label="Feature 13" variant="secondary" />
           </View>
           <Text
             style={[
@@ -210,7 +182,7 @@ export const BookmarksScreen: React.FC<BookmarksScreenProps> = ({
         <StateWrapper
           state={screenState}
           emptyTitle="No Saved Bookmarks Yet"
-          emptySubtitle="Tap the bookmark icon 🔖 on any project card in Search to save projects here."
+          emptySubtitle="Tap the bookmark icon on any project card in the marketplace or search to save projects here."
           emptyActionLabel="Browse Projects"
           onEmptyAction={onNavigateToSearch}
           errorMessage={errorMessage}
