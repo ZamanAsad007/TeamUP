@@ -98,6 +98,13 @@ export const projectService = {
   },
 
   /**
+   * Get user's active projects (where they are creator or accepted member)
+   */
+  getMyProjects: async (): Promise<Project[]> => {
+    return api.get<Project[]>('/projects/me');
+  },
+
+  /**
    * Get single project details by ID
    */
   getProjectById: async (id: string): Promise<Project> => {

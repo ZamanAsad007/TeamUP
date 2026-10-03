@@ -18,6 +18,7 @@ import { ProfileScreen } from '../screens/Profile/ProfileScreen';
 import { UserProfileScreen } from '../screens/Profile/UserProfileScreen';
 import { SettingsScreen } from '../screens/Settings/SettingsScreen';
 import { StateWrapper } from '../components/StateWrapper';
+import { MyProjectsScreen } from '../screens/MyProjects/MyProjectsScreen';
 
 export type RootStackParamList = {
   Landing: undefined;
@@ -36,6 +37,7 @@ export type RootStackParamList = {
   Profile: undefined;
   UserProfile: { userId: string; userName?: string; projectId?: string; invited?: boolean };
   Settings: undefined;
+  MyProjects: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -95,6 +97,7 @@ export const RootNavigator = () => {
             <Stack.Screen name="Profile" component={ProfileScreen} />
             <Stack.Screen name="UserProfile" component={UserProfileScreen} />
             <Stack.Screen name="Settings" component={SettingsScreen} />
+            <Stack.Screen name="MyProjects" component={MyProjectsScreen} />
           </>
         ) : (
           <>
