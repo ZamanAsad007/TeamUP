@@ -7,7 +7,10 @@ import {
   RefreshControl,
   TextInput,
   TouchableOpacity,
+  Platform,
+  StatusBar,
 } from 'react-native';
+import { useSafeInsets } from '../../utils/useSafeInsets';
 import { useTheme } from '../../theme/ThemeContext';
 import { Card } from '../../components/Card';
 import { Badge } from '../../components/Badge';
@@ -272,6 +275,9 @@ export const MatchingScreen: React.FC<{ navigation?: any }> = ({ navigation: pro
     return 'tertiary';
   };
 
+  const insets = useSafeInsets();
+  const topPadding = Platform.OS === 'android' ? Math.max(insets.top, StatusBar.currentHeight || 0) : insets.top;
+
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
@@ -280,7 +286,7 @@ export const MatchingScreen: React.FC<{ navigation?: any }> = ({ navigation: pro
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
-      <View style={{ padding: spacing.md }}>
+      <View style={{ padding: spacing.md, paddingTop: topPadding + spacing.sm }}>
         {/* Top Header & Project Selector */}
         <Card style={styles.headerCard}>
           <View style={styles.titleRow}>

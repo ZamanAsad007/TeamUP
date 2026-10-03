@@ -76,10 +76,7 @@ export const RootNavigator = () => {
               name="ProjectDetail"
               component={ProjectDetailScreen}
               options={{
-                headerShown: true,
-                title: 'Project Details',
-                headerStyle: { backgroundColor: colors.surface },
-                headerTintColor: colors.text,
+                headerShown: false,
               }}
             />
             <Stack.Screen

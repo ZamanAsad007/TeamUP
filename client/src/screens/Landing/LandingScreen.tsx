@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Platform,
   ActivityIndicator,
+  StatusBar,
 } from 'react-native';
 import {
   Users,
@@ -18,6 +19,7 @@ import {
   Code2,
   Sparkles,
 } from 'lucide-react-native';
+import { useSafeInsets } from '../../utils/useSafeInsets';
 import { useTheme } from '../../theme/ThemeContext';
 import { projectService, Project } from '../../services/projectService';
 import { TeamUpLogo } from '../../components/TeamUpLogo';
@@ -73,6 +75,9 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ navigation }) => {
   const textMutedColor = isDark ? '#A1A1AA' : '#71717A';
   const textPrimaryColor = isDark ? '#FAFAFA' : '#09090B';
 
+  const insets = useSafeInsets();
+  const topInset = Platform.OS === 'android' ? Math.max(insets.top, StatusBar.currentHeight || 0) : insets.top;
+
   return (
     <ScrollView
       style={[
@@ -81,7 +86,13 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ navigation }) => {
           backgroundColor: isDark ? '#09090B' : '#FFFFFF',
         },
       ]}
-      contentContainerStyle={styles.contentContainer}
+      contentContainerStyle={[
+        styles.contentContainer,
+        {
+          paddingTop: topInset + (Platform.OS === 'web' ? 14 : 10),
+          paddingBottom: Math.max(insets.bottom, 20) + 40,
+        },
+      ]}
       showsVerticalScrollIndicator={false}
     >
       {/* Ambient Lighting Accents */}
@@ -1026,7 +1037,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 14,
-    marginTop: 14,
+    marginTop: 0,
     borderWidth: 1,
     maxWidth: 1100,
     width: '100%',
