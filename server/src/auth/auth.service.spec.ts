@@ -13,6 +13,7 @@ describe('AuthService', () => {
     user: {
       findUnique: jest.fn(),
       create: jest.fn(),
+      update: jest.fn(),
     },
     refreshToken: {
       create: jest.fn(),
@@ -84,9 +85,8 @@ describe('AuthService', () => {
       });
 
       expect(mockPrismaService.user.create).toHaveBeenCalled();
-      expect(result.tokens.accessToken).toBe('access_token');
-      expect(result.tokens.refreshToken).toBe('refresh_token');
-      expect(result.user.email).toBe('test@example.com');
+      expect(result.message).toBe('Registration successful. Verification code sent.');
+      expect(result.email).toBe('test@example.com');
     });
   });
 

@@ -6,6 +6,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { LandingScreen } from '../screens/Landing/LandingScreen';
 import { LoginScreen } from '../screens/Auth/LoginScreen';
 import { RegisterScreen } from '../screens/Auth/RegisterScreen';
+import { VerifyEmailScreen } from '../screens/Auth/VerifyEmailScreen';
 import { TabNavigator } from './TabNavigator';
 import { WorkspaceNavigator } from './WorkspaceNavigator';
 import { ProjectDetailScreen } from '../screens/Marketplace/ProjectDetailScreen';
@@ -25,6 +26,7 @@ export type RootStackParamList = {
   Auth: undefined;
   Login: undefined;
   Register: undefined;
+  VerifyEmail: { email: string };
   MainApp: undefined;
   ProjectDetail: { projectId: string };
   CreateProject: undefined;
@@ -104,6 +106,7 @@ export const RootNavigator = () => {
             <Stack.Screen name="Landing" component={LandingScreen} />
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="Register" component={RegisterScreen} />
+            <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
           </>
         )}
       </Stack.Navigator>
