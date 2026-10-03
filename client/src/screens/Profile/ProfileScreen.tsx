@@ -7,6 +7,8 @@ import {
   RefreshControl,
   Linking,
   TouchableOpacity,
+  Platform,
+  Alert,
 } from 'react-native';
 import { NavigationContext } from '@react-navigation/native';
 import { useTheme } from '../../theme/ThemeContext';
@@ -127,6 +129,35 @@ export const ProfileScreen: React.FC<{ navigation?: any }> = ({ navigation: prop
       />
     );
   }
+
+  const handleLogout = () => {
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.confirm('Are you sure you want to log out of TeamUp?')) {
+        logout().catch(console.error);
+      }
+      return;
+    }
+
+    Alert.alert(
+      'Log Out',
+      'Are you sure you want to log out of TeamUp?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Log Out',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await logout();
+            } catch (err) {
+              console.error('Logout error:', err);
+            }
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  };
 
   // Check if profile details exist
   const isProfileEmpty = !user?.fullName && !user?.email;
@@ -341,8 +372,9 @@ export const ProfileScreen: React.FC<{ navigation?: any }> = ({ navigation: prop
                 />
 
                 <Button
+                  testID="profile-sign-out-button"
                   title="Sign Out"
-                  onPress={logout}
+                  onPress={handleLogout}
                   variant="outline"
                   style={{ minWidth: 220, maxWidth: 280, width: '100%', marginTop: spacing.sm, borderColor: colors.outlineVariant }}
                 />

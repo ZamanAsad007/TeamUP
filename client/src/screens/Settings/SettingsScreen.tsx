@@ -23,6 +23,13 @@ export const SettingsScreen: React.FC = () => {
   const [isServerModalOpen, setIsServerModalOpen] = useState(false);
 
   const handleLogout = () => {
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.confirm('Are you sure you want to log out of TeamUp?')) {
+        logout().catch(console.error);
+      }
+      return;
+    }
+
     Alert.alert(
       'Log Out',
       'Are you sure you want to log out of TeamUp?',
@@ -32,7 +39,11 @@ export const SettingsScreen: React.FC = () => {
           text: 'Log Out',
           style: 'destructive',
           onPress: async () => {
-            await logout();
+            try {
+              await logout();
+            } catch (err) {
+              console.error('Logout error:', err);
+            }
           },
         },
       ],
@@ -160,6 +171,7 @@ export const SettingsScreen: React.FC = () => {
         </Card>
 
         <Button
+          testID="settings-sign-out-button"
           title="Sign Out"
           variant="outline"
           onPress={handleLogout}

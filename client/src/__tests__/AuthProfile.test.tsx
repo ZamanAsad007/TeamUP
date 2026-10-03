@@ -2,8 +2,23 @@ import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 import { LoginScreen } from '../screens/Auth/LoginScreen';
 import { RegisterScreen } from '../screens/Auth/RegisterScreen';
+import { SettingsScreen } from '../screens/Settings/SettingsScreen';
+import { MoreScreen } from '../screens/More/MoreScreen';
 import { ThemeProvider } from '../theme/ThemeContext';
 import { AuthProvider } from '../context/AuthContext';
+import { tokenStorage } from '../services/tokenStorage';
+
+jest.mock('@react-navigation/native', () => {
+  const actual = jest.requireActual('@react-navigation/native');
+  return {
+    ...actual,
+    useNavigation: () => ({
+      navigate: jest.fn(),
+      goBack: jest.fn(),
+      canGoBack: jest.fn().mockReturnValue(true),
+    }),
+  };
+});
 
 describe('Auth & Profile Screens', () => {
   const mockNavigation = { navigate: jest.fn() };
@@ -55,5 +70,44 @@ describe('Auth & Profile Screens', () => {
 
     fireEvent.press(registerButton);
     expect(getByText(/Passwords do not match/i)).toBeTruthy();
+  });
+
+  it('SettingsScreen renders Sign Out button with testID', () => {
+    const { getByTestId, getByText } = render(
+      <ThemeProvider>
+        <AuthProvider>
+          <SettingsScreen />
+        </AuthProvider>
+      </ThemeProvider>
+    );
+
+    const signOutBtn = getByTestId('settings-sign-out-button');
+    expect(signOutBtn).toBeTruthy();
+    expect(getByText('Sign Out')).toBeTruthy();
+  });
+
+  it('MoreScreen renders Sign Out button with testID', () => {
+    const { getByTestId, getByText } = render(
+      <ThemeProvider>
+        <AuthProvider>
+          <MoreScreen />
+        </AuthProvider>
+      </ThemeProvider>
+    );
+
+    const signOutBtn = getByTestId('more-sign-out-button');
+    expect(signOutBtn).toBeTruthy();
+    expect(getByText('Sign Out')).toBeTruthy();
+  });
+
+  it('tokenStorage clearAll removes stored tokens cleanly', async () => {
+    await tokenStorage.setAccessToken('access-token-123');
+    await tokenStorage.setRefreshToken('refresh-token-456');
+    expect(await tokenStorage.getAccessToken()).toBe('access-token-123');
+    expect(await tokenStorage.getRefreshToken()).toBe('refresh-token-456');
+
+    await tokenStorage.clearAll();
+    expect(await tokenStorage.getAccessToken()).toBeNull();
+    expect(await tokenStorage.getRefreshToken()).toBeNull();
   });
 });

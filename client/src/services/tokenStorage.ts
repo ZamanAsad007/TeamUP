@@ -19,7 +19,12 @@ async function setItem(key: string, value: string): Promise<void> {
       memoryStore[key] = value;
     }
   } else {
-    await SecureStore.setItemAsync(key, value);
+    try {
+      await SecureStore.setItemAsync(key, value);
+    } catch {
+      // Ignore SecureStore error and rely on memoryStore
+    }
+    memoryStore[key] = value;
   }
 }
 
@@ -34,7 +39,15 @@ async function getItem(key: string): Promise<string | null> {
       return memoryStore[key] || null;
     }
   } else {
-    return await SecureStore.getItemAsync(key);
+    try {
+      const res = await SecureStore.getItemAsync(key);
+      if (res !== null && res !== undefined) {
+        return res;
+      }
+    } catch {
+      // Ignore SecureStore error and fallback
+    }
+    return memoryStore[key] || null;
   }
 }
 
@@ -49,7 +62,12 @@ async function deleteItem(key: string): Promise<void> {
       delete memoryStore[key];
     }
   } else {
-    await SecureStore.deleteItemAsync(key);
+    try {
+      await SecureStore.deleteItemAsync(key);
+    } catch {
+      // Key may not exist or secure store unavailable, suppress error
+    }
+    delete memoryStore[key];
   }
 }
 
@@ -63,7 +81,18 @@ export const tokenStorage = {
   removeRefreshToken: () => deleteItem(REFRESH_TOKEN_KEY),
 
   clearAll: async () => {
-    await deleteItem(ACCESS_TOKEN_KEY);
-    await deleteItem(REFRESH_TOKEN_KEY);
+    try {
+      await deleteItem(ACCESS_TOKEN_KEY);
+    } catch {
+      // Ignore
+    }
+    try {
+      await deleteItem(REFRESH_TOKEN_KEY);
+    } catch {
+      // Ignore
+    }
+    for (const key of Object.keys(memoryStore)) {
+      delete memoryStore[key];
+    }
   },
 };
