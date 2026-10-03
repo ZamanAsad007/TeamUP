@@ -317,8 +317,15 @@ export class AuthService {
 
   
   async verifyOtp(dto: { email: string; code: string }): Promise<AuthResponse> {
+    const cleanEmail = dto.email?.trim()?.toLowerCase();
+    const cleanCode = dto.code?.trim();
+
+    if (!cleanEmail) {
+      throw new BadRequestException('Email is required');
+    }
+
     const user = await this.prisma.user.findUnique({
-      where: { email: dto.email.toLowerCase() },
+      where: { email: cleanEmail },
     });
 
     if (!user) {
@@ -329,7 +336,7 @@ export class AuthService {
       throw new BadRequestException('Account is already verified');
     }
 
-    if (user.otpCode !== dto.code) {
+    if (user.otpCode !== cleanCode) {
       throw new UnauthorizedException('Invalid verification code');
     }
 
