@@ -25,7 +25,7 @@ export const VerifyEmailScreen: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      await verifyOtp(email, code);
+      await verifyOtp(email?.trim(), code.trim());
     } catch (err: any) {
       setError(err?.message || err?.response?.data?.message || 'Verification failed');
     } finally {

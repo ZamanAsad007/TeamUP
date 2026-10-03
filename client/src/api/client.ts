@@ -98,9 +98,15 @@ apiClient.interceptors.response.use(
     }
 
     if (error.response && error.response.data && typeof error.response.data === 'object') {
-      const responseData = error.response.data;
-      if (responseData.error) {
+      const responseData = error.response.data as any;
+      if (typeof responseData.error === 'object' && responseData.error?.message) {
         throw new ApiError(responseData.error.message, responseData.error.code);
+      }
+      if (typeof responseData.message === 'string') {
+        throw new ApiError(responseData.message, typeof responseData.error === 'string' ? responseData.error : 'ERROR');
+      }
+      if (Array.isArray(responseData.message)) {
+        throw new ApiError(responseData.message.join(', '), 'VALIDATION_ERROR');
       }
     }
     const message = error.message || 'Network error occurred.';
