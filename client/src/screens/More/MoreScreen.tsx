@@ -20,6 +20,7 @@ import {
   Moon,
   ChevronRight,
   LogOut,
+  FolderKanban,
   LucideIcon,
 } from 'lucide-react-native';
 import { useTheme } from '../../theme/ThemeContext';
@@ -73,6 +74,13 @@ export const MoreScreen: React.FC = () => {
   };
 
   const menuItems: MenuItem[] = [
+    {
+      id: 'my-projects',
+      title: 'My Projects',
+      subtitle: 'Projects you own or joined',
+      icon: FolderKanban,
+      route: 'MyProjects',
+    },
     {
       id: 'profile',
       title: 'Profile',

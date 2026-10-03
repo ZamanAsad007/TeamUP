@@ -70,6 +70,15 @@ export class ProjectsController {
   }
 
   /**
+   * Get user's own projects (creator or accepted member)
+   */
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  async getMyProjects(@CurrentUser() user: AuthenticatedUser) {
+    return this.projectsService.getMyProjects(user.userId);
+  }
+
+  /**
    * Get project details by ID
    */
   @Get(':id')
