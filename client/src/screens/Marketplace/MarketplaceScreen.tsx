@@ -9,6 +9,7 @@ import {
   ScrollView,
   Platform,
   useWindowDimensions,
+  StatusBar,
 } from 'react-native';
 import { Bell, Plus, Rocket, Sparkles, ArrowRight, Users, Lightbulb } from 'lucide-react-native';
 import { useSafeInsets } from '../../utils/useSafeInsets';
@@ -488,6 +489,8 @@ export const MarketplaceScreen: React.FC<MarketplaceScreenProps> = ({ navigation
     );
   };
 
+  const topPadding = Platform.OS === 'android' ? Math.max(insets.top, StatusBar.currentHeight || 0) : insets.top;
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header section with Greeting and Actions */}
@@ -495,7 +498,7 @@ export const MarketplaceScreen: React.FC<MarketplaceScreenProps> = ({ navigation
         style={[
           styles.header,
           {
-            paddingTop: insets.top + spacing.sm,
+            paddingTop: topPadding + spacing.sm,
             backgroundColor: isDark
               ? 'rgba(9, 9, 11, 0.82)'
               : 'rgba(255, 255, 255, 0.85)',

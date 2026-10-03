@@ -7,7 +7,10 @@ import {
   RefreshControl,
   TouchableOpacity,
   Linking,
+  Platform,
+  StatusBar,
 } from 'react-native';
+import { useSafeInsets } from '../../utils/useSafeInsets';
 import { useTheme } from '../../theme/ThemeContext';
 import { Card } from '../../components/Card';
 import { Button } from '../../components/Button';
@@ -149,6 +152,9 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
     .join('')
     .toUpperCase() || 'U';
 
+  const insets = useSafeInsets();
+  const topPadding = Platform.OS === 'android' ? Math.max(insets.top, StatusBar.currentHeight || 0) : insets.top;
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Top Header with Back Navigation */}
@@ -158,6 +164,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
           {
             backgroundColor: colors.surface,
             borderBottomColor: colors.outlineVariant,
+            paddingTop: topPadding + 10,
           },
         ]}
       >
