@@ -13,6 +13,7 @@ describe('AuthService', () => {
     user: {
       findUnique: jest.fn(),
       create: jest.fn(),
+      update: jest.fn(),
     },
     refreshToken: {
       create: jest.fn(),
@@ -54,7 +55,7 @@ describe('AuthService', () => {
 
   describe('register', () => {
     it('should throw ConflictException if user already exists', async () => {
-      mockPrismaService.user.findUnique.mockResolvedValue({ id: 'user-1' });
+      mockPrismaService.user.findUnique.mockResolvedValue({ id: 'user-1', isVerified: true });
 
       await expect(
         service.register({
@@ -84,9 +85,8 @@ describe('AuthService', () => {
       });
 
       expect(mockPrismaService.user.create).toHaveBeenCalled();
-      expect(result.tokens.accessToken).toBe('access_token');
-      expect(result.tokens.refreshToken).toBe('refresh_token');
-      expect(result.user.email).toBe('test@example.com');
+      expect(result.message).toBe('Registration successful. Verification code sent.');
+      expect(result.email).toBe('test@example.com');
     });
   });
 
@@ -109,6 +109,7 @@ describe('AuthService', () => {
         email: 'test@example.com',
         password: hashedPassword,
         role: 'STUDENT',
+        isVerified: true,
       });
 
       await expect(
@@ -126,6 +127,7 @@ describe('AuthService', () => {
         email: 'test@example.com',
         password: hashedPassword,
         role: 'STUDENT',
+        isVerified: true,
       });
       mockJwtService.signAsync
         .mockResolvedValueOnce('access_token')
@@ -168,6 +170,7 @@ describe('AuthService', () => {
         role: 'STUDENT',
       });
       mockJwtService.signAsync
+        .mockReset()
         .mockResolvedValueOnce('new_access_token')
         .mockResolvedValueOnce('new_refresh_token');
       mockPrismaService.refreshToken.create.mockResolvedValue({ id: 'rt-2' });

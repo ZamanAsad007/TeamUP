@@ -11,3 +11,11 @@ export const register = async (data: any) => {
 export const refresh = async (refreshToken: string) => {
   return api.post('/auth/refresh', { refreshToken });
 };
+
+export const verifyOtp = async (email: string, code: string) => {
+  return api.post('/auth/verify-otp', { email, code });
+};
+
+export const resendOtp = async (email: string) => {
+  return api.post('/auth/resend-otp', { email });
+};
