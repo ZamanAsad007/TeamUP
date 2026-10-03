@@ -14,6 +14,7 @@ import { AuthTokens, AuthResponse } from './interfaces/tokens.interface';
 import { UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
+import * as nodemailer from 'nodemailer';
 
 @Injectable()
 export class AuthService {
@@ -156,9 +157,36 @@ export class AuthService {
     return Math.floor(100000 + Math.random() * 900000).toString();
   }
 
-  private async sendOtpEmail(email: string, code: string): Promise<void> {
-    console.log(`[MOCK EMAIL SERVICE] Sending OTP ${code} to ${email}`);
-    // In a real app, integrate Nodemailer or Resend here.
+    private async sendOtpEmail(email: string, code: string): Promise<void> {
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: this.configService.get<string>('SMTP_USER'),
+        pass: this.configService.get<string>('SMTP_PASS'),
+      },
+    });
+
+    try {
+      await transporter.sendMail({
+        from: '"TeamUp Verification" <noreply@teamup.local>',
+        to: email,
+        subject: 'Your TeamUp Verification Code',
+        text: `Your TeamUp verification code is: ${code}. It will expire in 15 minutes.`,
+        html: `
+          <div style="font-family: Arial, sans-serif; padding: 20px;">
+            <h2>TeamUp Verification</h2>
+            <p>Your verification code is:</p>
+            <h1 style="color: #4A90E2; letter-spacing: 5px;">${code}</h1>
+            <p>It will expire in 15 minutes. If you didn't request this, you can safely ignore this email.</p>
+          </div>
+        `,
+      });
+      console.log(`[EMAIL SERVICE] OTP successfully sent to ${email}`);
+    } catch (error) {
+      console.error(`[EMAIL SERVICE] Failed to send OTP to ${email}: `, error);
+      // We log but don't throw, to prevent blocking if email service goes down temporarily, 
+      // but in production we'd want a proper dead-letter queue or retry mechanism.
+    }
   }
 
   private hashToken(token: string): string {
