@@ -5,6 +5,8 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Alert,
+  Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import {
@@ -17,6 +19,7 @@ import {
   Sun,
   Moon,
   ChevronRight,
+  LogOut,
   LucideIcon,
 } from 'lucide-react-native';
 import { useTheme } from '../../theme/ThemeContext';
@@ -24,6 +27,7 @@ import { useAuth } from '../../context/AuthContext';
 import { AppHeader } from '../../components/AppHeader';
 import { Card } from '../../components/Card';
 import { Badge } from '../../components/Badge';
+import { Button } from '../../components/Button';
 
 interface MenuItem {
   id: string;
@@ -37,7 +41,36 @@ interface MenuItem {
 export const MoreScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { colors, typography, spacing, borderRadius, isDark, toggleTheme } = useTheme();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+
+  const handleLogout = () => {
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.confirm('Are you sure you want to log out of TeamUp?')) {
+        logout().catch(console.error);
+      }
+      return;
+    }
+
+    Alert.alert(
+      'Log Out',
+      'Are you sure you want to log out of TeamUp?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Log Out',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await logout();
+            } catch (err) {
+              console.error('Logout error:', err);
+            }
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  };
 
   const menuItems: MenuItem[] = [
     {
@@ -234,6 +267,23 @@ export const MoreScreen: React.FC = () => {
             </TouchableOpacity>
           );
         })}
+
+        <View style={{ marginTop: spacing.xl, alignItems: 'center' }}>
+          <Button
+            testID="more-sign-out-button"
+            title="Sign Out"
+            variant="outline"
+            icon={<LogOut size={16} color={colors.accent} />}
+            onPress={handleLogout}
+            style={{
+              borderColor: colors.accent,
+              minWidth: 200,
+              maxWidth: 280,
+              width: '100%',
+            }}
+            textStyle={{ color: colors.accent }}
+          />
+        </View>
       </ScrollView>
     </View>
   );

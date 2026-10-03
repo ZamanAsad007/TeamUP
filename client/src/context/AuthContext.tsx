@@ -321,15 +321,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async (): Promise<void> => {
-    setIsLoading(true);
     try {
-      await pushNotificationService.deregisterDevicePushToken();
-      await tokenStorage.clearAll();
-      setToken(null);
-      setUser(null);
-    } finally {
-      setIsLoading(false);
+      const refreshToken = await tokenStorage.getRefreshToken().catch(() => null);
+      if (refreshToken) {
+        api.post('/auth/logout', { refreshToken }).catch(() => {});
+      }
+    } catch {
+      // Suppress network/token lookup errors during logout
     }
+
+    // Immediately clear tokens and user state to trigger navigation to unauthenticated stack
+    setToken(null);
+    setUser(null);
+
+    // Safely clear stored auth tokens from persistent storage and memory
+    try {
+      await tokenStorage.clearAll();
+    } catch {
+      // Ignore storage errors
+    }
+
+    // Deregister push token in background without blocking UI
+    pushNotificationService.deregisterDevicePushToken().catch(() => {});
   };
 
   const updateUser = (updatedUser: Partial<UserProfile>) => {
