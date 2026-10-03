@@ -5,7 +5,6 @@ import { useTheme } from '../../theme/ThemeContext';
 import { AppHeader } from '../../components/AppHeader';
 import { Button } from '../../components/Button';
 import { api } from '../../api/client';
-import { setTokens, setRole } from '../../services/tokenStorage';
 import { useAuth } from '../../context/AuthContext';
 
 export const VerifyEmailScreen: React.FC = () => {
@@ -16,7 +15,7 @@ export const VerifyEmailScreen: React.FC = () => {
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const { refreshAuth } = useAuth();
+  const { verifyOtp } = useAuth();
 
   const handleVerify = async () => {
     if (!code || code.length !== 6) {
@@ -26,14 +25,9 @@ export const VerifyEmailScreen: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const res = await api.post<{ tokens: { accessToken: string; refreshToken: string }, user: any }>('/auth/verify-otp', { email, code });
-      if (res.tokens) {
-        await setTokens(res.tokens.accessToken, res.tokens.refreshToken);
-        await setRole(res.user.role || 'STUDENT');
-        refreshAuth(); // Update AuthContext state
-      }
+      await verifyOtp(email, code);
     } catch (err: any) {
-      setError(err.message || 'Verification failed');
+      setError(err?.message || err?.response?.data?.message || 'Verification failed');
     } finally {
       setLoading(false);
     }

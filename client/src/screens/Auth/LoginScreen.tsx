@@ -109,6 +109,11 @@ export const LoginScreen = ({ navigation }: any) => {
         await login(email.trim(), password);
       }
     } catch (err: any) {
+      const errMsg = err?.message || err?.response?.data?.message || '';
+      if (errMsg === 'ACCOUNT_NOT_VERIFIED' || errMsg.includes('ACCOUNT_NOT_VERIFIED')) {
+        navigation.navigate('VerifyEmail', { email: email.trim() });
+        return;
+      }
       if (err instanceof ApiError) {
         setErrorMsg(err.message || `Error (${err.code}): Failed to sign in.`);
       } else if (err?.response?.status === 401) {
