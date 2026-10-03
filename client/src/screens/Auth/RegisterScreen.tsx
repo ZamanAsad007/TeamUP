@@ -109,11 +109,12 @@ export const RegisterScreen = ({ navigation }: any) => {
     setErrorMsg(null);
     try {
       await register(fullName.trim(), email.trim(), password);
-    } catch (err) {
+      navigation.navigate('VerifyEmail', { email: email.trim() });
+    } catch (err: any) {
       if (err instanceof ApiError) {
         setErrorMsg(err.message || `Error (${err.code}): Registration failed.`);
       } else {
-        setErrorMsg('Unable to connect to server. Please check your network.');
+        setErrorMsg(err?.message || 'Unable to connect to server. Please check your network.');
       }
     } finally {
       setLoading(false);

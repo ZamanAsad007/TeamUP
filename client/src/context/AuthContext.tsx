@@ -33,6 +33,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
+  verifyOtp: (email: string, code: string) => Promise<void>;
   loginWithGithub: (code: string, redirectUri?: string) => Promise<void>;
   register: (fullName: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -287,6 +288,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const verifyOtp = async (email: string, code: string): Promise<void> => {
+    setIsLoading(true);
+    try {
+      const res = await api.post<any>('/auth/verify-otp', {
+        email,
+        code,
+      });
+
+      const accessToken = res?.tokens?.accessToken || res?.accessToken;
+      const refreshToken = res?.tokens?.refreshToken || res?.refreshToken;
+
+      if (accessToken) {
+        await tokenStorage.setAccessToken(accessToken);
+        if (refreshToken) {
+          await tokenStorage.setRefreshToken(refreshToken);
+        }
+        setToken(accessToken);
+
+        if (res.user) {
+          try {
+            const profile = await api.get<UserProfile>('/profiles/me');
+            setUser(normalizeUserProfile(profile, res.user, email));
+          } catch {
+            setUser(normalizeUserProfile(res.user, null, email));
+          }
+        } else {
+          try {
+            const profile = await api.get<UserProfile>('/profiles/me');
+            setUser(normalizeUserProfile(profile, null, email));
+          } catch {
+            setUser(normalizeUserProfile({ email, fullName: email.split('@')[0] }, null, email));
+          }
+        }
+
+        await pushNotificationService.registerDevicePushToken();
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const register = async (fullName: string, email: string, password: string): Promise<void> => {
     setIsLoading(true);
     try {
@@ -357,6 +399,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         isAuthenticated: !!token,
         login,
+        verifyOtp,
         loginWithGithub,
         register,
         logout,
@@ -378,6 +421,7 @@ export const useAuth = (): AuthContextType => {
       isLoading: false,
       isAuthenticated: false,
       login: async () => {},
+      verifyOtp: async () => {},
       loginWithGithub: async () => {},
       register: async () => {},
       logout: async () => {},
