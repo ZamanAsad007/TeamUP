@@ -20,6 +20,7 @@ import { StateWrapper, ScreenState } from '../../components/StateWrapper';
 import { IdeaCard, ProjectIdea } from '../../components/IdeaCard';
 import { AILoadingCard } from '../../components/AILoadingCard';
 import { api } from '../../api/client';
+import { bookmarkService } from '../../services/bookmarkService';
 
 const DOMAIN_OPTIONS = ['Fintech', 'Healthcare', 'Education', 'AI & ML', 'Cybersecurity', 'IoT'];
 const TECH_OPTIONS = ['React Native', 'TypeScript', 'NestJS', 'Python', 'PostgreSQL', 'Flutter'];
@@ -257,7 +258,25 @@ export const IdeaHubScreen: React.FC<IdeaHubScreenProps> = ({ navigation }) => {
     }
   };
 
-  const handleToggleSave = (ideaId: string) => {
+  useEffect(() => {
+    let isMounted = true;
+    bookmarkService
+      .getBookmarkedIdeaIds()
+      .then((ids) => {
+        if (!isMounted || !Array.isArray(ids) || ids.length === 0) return;
+        const idSet = new Set(ids);
+        setFeedIdeas((prev) =>
+          prev.map((item) => ({ ...item, isSaved: idSet.has(item.id) }))
+        );
+      })
+      .catch(() => {});
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleToggleSave = async (ideaId: string) => {
     setFeedIdeas((prev) =>
       prev.map((item) =>
         item.id === ideaId ? { ...item, isSaved: !item.isSaved } : item
@@ -265,6 +284,20 @@ export const IdeaHubScreen: React.FC<IdeaHubScreenProps> = ({ navigation }) => {
     );
     if (generatedIdea && generatedIdea.id === ideaId) {
       setGeneratedIdea({ ...generatedIdea, isSaved: !generatedIdea.isSaved });
+    }
+
+    try {
+      await bookmarkService.toggleIdeaBookmark(ideaId);
+    } catch {
+      // Revert optimistic update on failure
+      setFeedIdeas((prev) =>
+        prev.map((item) =>
+          item.id === ideaId ? { ...item, isSaved: !item.isSaved } : item
+        )
+      );
+      if (generatedIdea && generatedIdea.id === ideaId) {
+        setGeneratedIdea({ ...generatedIdea, isSaved: !generatedIdea.isSaved });
+      }
     }
   };
 

@@ -35,13 +35,13 @@ describe('Bookmarks (Phase 6 - Feature 13)', () => {
 
   it('triggers haptic feedback when bookmark button is pressed on ProjectCard', () => {
     const onToggleMock = jest.fn();
-    const { getByText } = render(
+    const { getByTestId } = render(
       <ThemeProvider>
         <ProjectCard project={mockProject} onBookmarkToggle={onToggleMock} />
       </ThemeProvider>
     );
 
-    const bookmarkBtn = getByText('🔖');
+    const bookmarkBtn = getByTestId('bookmark-button');
     fireEvent.press(bookmarkBtn);
 
     expect(onToggleMock).toHaveBeenCalledWith('proj-1');
@@ -49,7 +49,16 @@ describe('Bookmarks (Phase 6 - Feature 13)', () => {
   });
 
   it('renders bookmarked projects list on BookmarksScreen', async () => {
-    jest.spyOn(bookmarkService, 'getBookmarkedIds').mockResolvedValueOnce(['proj-101']);
+    jest.spyOn(bookmarkService, 'getBookmarkedProjects').mockResolvedValueOnce([
+      {
+        id: 'proj-101',
+        title: 'TeamUp - Student Partner Finder',
+        description: 'A student matching platform.',
+        domain: 'Education',
+        status: 'OPEN',
+        isBookmarked: true,
+      },
+    ]);
 
     const { findByText } = render(
       <ThemeProvider>
@@ -58,34 +67,43 @@ describe('Bookmarks (Phase 6 - Feature 13)', () => {
     );
 
     expect(await findByText('Saved Bookmarks')).toBeTruthy();
-    expect(await findByText('TeamUp — Student Partner Finder')).toBeTruthy();
+    expect(await findByText('TeamUp - Student Partner Finder')).toBeTruthy();
   });
 
   it('optimistically removes project from list when unbookmarked', async () => {
-    jest.spyOn(bookmarkService, 'getBookmarkedIds').mockResolvedValueOnce(['proj-101']);
+    jest.spyOn(bookmarkService, 'getBookmarkedProjects').mockResolvedValueOnce([
+      {
+        id: 'proj-101',
+        title: 'TeamUp - Student Partner Finder',
+        description: 'A student matching platform.',
+        domain: 'Education',
+        status: 'OPEN',
+        isBookmarked: true,
+      },
+    ]);
     jest.spyOn(bookmarkService, 'toggleBookmark').mockResolvedValueOnce(false);
 
-    const { findByText, getByText, queryByText } = render(
+    const { findByText, getByTestId, queryByText } = render(
       <ThemeProvider>
         <BookmarksScreen />
       </ThemeProvider>
     );
 
-    await findByText('TeamUp — Student Partner Finder');
+    await findByText('TeamUp - Student Partner Finder');
 
-    const bookmarkBtn = getByText('🔖');
+    const bookmarkBtn = getByTestId('bookmark-button');
     fireEvent.press(bookmarkBtn);
 
     // Immediately removed from view (optimistic UI update)
     await waitFor(() => {
-      expect(queryByText('TeamUp — Student Partner Finder')).toBeNull();
+      expect(queryByText('TeamUp - Student Partner Finder')).toBeNull();
     });
 
     expect(bookmarkService.toggleBookmark).toHaveBeenCalled();
   });
 
   it('renders empty state when no projects are bookmarked', async () => {
-    jest.spyOn(bookmarkService, 'getBookmarkedIds').mockResolvedValueOnce([]);
+    jest.spyOn(bookmarkService, 'getBookmarkedProjects').mockResolvedValueOnce([]);
 
     const { findByText } = render(
       <ThemeProvider>

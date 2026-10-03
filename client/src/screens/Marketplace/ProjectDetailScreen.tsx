@@ -18,7 +18,9 @@ import { Chip } from '../../components/Chip';
 import { Button } from '../../components/Button';
 import { StateWrapper, ScreenState } from '../../components/StateWrapper';
 import { projectService, Project } from '../../services/projectService';
+import { bookmarkService } from '../../services/bookmarkService';
 import { useAuth } from '../../context/AuthContext';
+import { Bookmark } from 'lucide-react-native';
 
 export interface ProjectDetailScreenProps {
   route?: {
@@ -43,6 +45,29 @@ export const ProjectDetailScreen: React.FC<ProjectDetailScreenProps> = ({ route,
   // Application Modal/Sheet
   const [isApplySheetOpen, setIsApplySheetOpen] = useState(false);
   const [applicationNote, setApplicationNote] = useState('');
+  const [isBookmarked, setIsBookmarked] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (projectId) {
+      bookmarkService
+        .getBookmarkedIds()
+        .then((ids) => {
+          setIsBookmarked(ids.includes(projectId));
+        })
+        .catch(() => {});
+    }
+  }, [projectId]);
+
+  const handleToggleBookmark = async () => {
+    if (!projectId) return;
+    const newStatus = !isBookmarked;
+    setIsBookmarked(newStatus);
+    try {
+      await bookmarkService.toggleBookmark({ id: projectId });
+    } catch {
+      setIsBookmarked(!newStatus);
+    }
+  };
 
   const fetchProjectDetails = useCallback(() => {
     if (!projectId) {
@@ -113,6 +138,19 @@ export const ProjectDetailScreen: React.FC<ProjectDetailScreenProps> = ({ route,
         subtitle="Overview"
         showBack={true}
         onBack={() => navigation?.goBack()}
+        actions={[
+          {
+            icon: (
+              <Bookmark
+                size={20}
+                color={isBookmarked ? colors.primary : colors.text}
+                fill={isBookmarked ? colors.primary : 'none'}
+              />
+            ),
+            onPress: handleToggleBookmark,
+            accessibilityLabel: isBookmarked ? 'Remove bookmark' : 'Bookmark project',
+          },
+        ]}
       />
 
       <StateWrapper

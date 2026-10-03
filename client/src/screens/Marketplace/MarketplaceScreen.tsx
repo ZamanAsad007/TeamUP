@@ -11,7 +11,7 @@ import {
   useWindowDimensions,
   StatusBar,
 } from 'react-native';
-import { Bell, Plus, Rocket, Sparkles, ArrowRight, Users, Lightbulb } from 'lucide-react-native';
+import { Bell, Plus, Rocket, Sparkles, ArrowRight, Users, Lightbulb, Bookmark } from 'lucide-react-native';
 import { useSafeInsets } from '../../utils/useSafeInsets';
 import { useTheme } from '../../theme/ThemeContext';
 import { Card } from '../../components/Card';
@@ -24,6 +24,7 @@ import { StateWrapper, ScreenState } from '../../components/StateWrapper';
 import { projectService, Project } from '../../services/projectService';
 import { notificationService } from '../../services/notificationService';
 import { socketService } from '../../services/socketService';
+import { bookmarkService } from '../../services/bookmarkService';
 import { useAuth } from '../../context/AuthContext';
 
 export interface MarketplaceScreenProps {
@@ -44,6 +45,7 @@ export const MarketplaceScreen: React.FC<MarketplaceScreenProps> = ({ navigation
   const [selectedDomain, setSelectedDomain] = useState('All');
   const [refreshing, setRefreshing] = useState(false);
   const [unreadCount, setUnreadCount] = useState<number>(0);
+  const [bookmarkedProjectIds, setBookmarkedProjectIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let isMounted = true;
@@ -51,6 +53,13 @@ export const MarketplaceScreen: React.FC<MarketplaceScreenProps> = ({ navigation
       .getUnreadCount()
       .then((count) => {
         if (isMounted) setUnreadCount(count);
+      })
+      .catch(() => {});
+
+    bookmarkService
+      .getBookmarkedIds()
+      .then((ids) => {
+        if (isMounted) setBookmarkedProjectIds(new Set(ids));
       })
       .catch(() => {});
 
@@ -75,9 +84,38 @@ export const MarketplaceScreen: React.FC<MarketplaceScreenProps> = ({ navigation
           setUnreadCount(count);
         })
         .catch(() => {});
+
+      bookmarkService
+        .getBookmarkedIds()
+        .then((ids) => {
+          setBookmarkedProjectIds(new Set(ids));
+        })
+        .catch(() => {});
     });
     return unsubscribeFocus;
   }, [navigation]);
+
+  const handleToggleBookmark = async (project: Project) => {
+    const isSaved = bookmarkedProjectIds.has(project.id);
+    setBookmarkedProjectIds((prev) => {
+      const next = new Set(prev);
+      if (isSaved) next.delete(project.id);
+      else next.add(project.id);
+      return next;
+    });
+
+    try {
+      await bookmarkService.toggleBookmark(project);
+    } catch {
+      // Revert optimistic update on failure
+      setBookmarkedProjectIds((prev) => {
+        const next = new Set(prev);
+        if (isSaved) next.add(project.id);
+        else next.delete(project.id);
+        return next;
+      });
+    }
+  };
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
@@ -389,6 +427,8 @@ export const MarketplaceScreen: React.FC<MarketplaceScreenProps> = ({ navigation
       (req) => (req.skill?.name || req.skillName)?.trim()
     );
 
+    const isBookmarked = bookmarkedProjectIds.has(item.id);
+
     return (
       <View style={[styles.projectCardWrapper, isWide && styles.projectCardWrapperWide]}>
         <Card
@@ -425,10 +465,34 @@ export const MarketplaceScreen: React.FC<MarketplaceScreenProps> = ({ navigation
                   </View>
                 </View>
               </View>
-              <Badge
-                label={item.status || 'OPEN'}
-                variant={item.status === 'OPEN' ? 'secondary' : 'primary'}
-              />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Bookmark project"
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  style={{
+                    padding: 6,
+                    borderRadius: borderRadius.sm,
+                    backgroundColor: isBookmarked ? colors.primaryContainer : colors.surfaceMuted,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                  }}
+                  onPress={(e) => {
+                    e?.stopPropagation?.();
+                    handleToggleBookmark(item);
+                  }}
+                >
+                  <Bookmark
+                    size={14}
+                    color={isBookmarked ? colors.primary : colors.textMuted}
+                    fill={isBookmarked ? colors.primary : 'none'}
+                  />
+                </TouchableOpacity>
+                <Badge
+                  label={item.status || 'OPEN'}
+                  variant={item.status === 'OPEN' ? 'secondary' : 'primary'}
+                />
+              </View>
             </View>
 
             <View style={[styles.metaRow, { marginTop: spacing.md }]}>
