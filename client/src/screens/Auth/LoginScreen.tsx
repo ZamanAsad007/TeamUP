@@ -15,7 +15,6 @@ import { Card } from '../../components/Card';
 import { Button } from '../../components/Button';
 import { GitHubIcon } from '../../components/GitHubIcon';
 import { useAuth } from '../../context/AuthContext';
-import { api } from '../../api/client';
 import { api, ApiError } from '../../api/client';
 
 import * as apiAuth from '../../api/auth';
