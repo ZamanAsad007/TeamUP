@@ -239,16 +239,6 @@ export class AuthService {
     });
 
     if (existing) {
-      if (!existing.isVerified) {
-        const otpCode = this.generateOtp();
-        const otpExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
-        await this.prisma.user.update({
-          where: { id: existing.id },
-          data: { otpCode, otpExpiresAt },
-        });
-        await this.sendOtpEmail(existing.email, otpCode);
-        return { message: 'Verification code sent', email: existing.email };
-      }
       throw new ConflictException('A user with this email already exists');
     }
 

@@ -48,6 +48,12 @@ export async function registerUser(
     );
   }
 
+  // Auto-verify test user in database so subsequent login in e2e tests succeeds
+  await prisma.user.update({
+    where: { email },
+    data: { isVerified: true, otpCode: null, otpExpiresAt: null },
+  });
+
   const login = await request(app.getHttpServer())
     .post(R.login)
     .send({ email, password });
