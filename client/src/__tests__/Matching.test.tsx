@@ -68,7 +68,7 @@ describe('Skill-Based Matching (Phase 3 - Feature 2)', () => {
 
     // Check matching skills
     expect(getAllByText('React Native').length).toBeGreaterThan(0);
-    expect(getByText('TypeScript')).toBeTruthy();
+    expect(getAllByText('TypeScript').length).toBeGreaterThan(0);
   });
 
   it('handles optimistic invite action and transitions to Invited state', async () => {
@@ -208,7 +208,37 @@ describe('Skill-Based Matching (Phase 3 - Feature 2)', () => {
     fireEvent.press(dropdown);
 
     expect(await findByText('Choose Project')).toBeTruthy();
-    expect(await findByText('General Skill Search')).toBeTruthy();
+    expect(await findByText('+ Create New Project')).toBeTruthy();
+  });
+
+  it('filters candidates when a skill tab is pressed', async () => {
+    (api.get as jest.Mock).mockResolvedValueOnce(mockCandidates);
+
+    const { findByText, getByText, queryByText, getByLabelText } = render(
+      <ThemeProvider>
+        <MatchingScreen />
+      </ThemeProvider>
+    );
+
+    // Initial render shows both candidates
+    expect(await findByText('Alice Johnson')).toBeTruthy();
+    expect(getByText('Bob Smith')).toBeTruthy();
+
+    // Alice has TypeScript, Bob does not. Press TypeScript tab.
+    const tsTab = getByLabelText('Filter by skill TypeScript');
+    fireEvent.press(tsTab);
+
+    // Alice Johnson should remain, Bob Smith should be filtered out
+    expect(getByText('Alice Johnson')).toBeTruthy();
+    expect(queryByText('Bob Smith')).toBeNull();
+
+    // Reset filter to All Skills
+    const allTab = getByLabelText('Filter by skill All');
+    fireEvent.press(allTab);
+
+    // Both should be visible again
+    expect(getByText('Alice Johnson')).toBeTruthy();
+    expect(getByText('Bob Smith')).toBeTruthy();
   });
 });
 
