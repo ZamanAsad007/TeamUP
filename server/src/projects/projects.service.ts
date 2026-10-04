@@ -876,7 +876,12 @@ export class ProjectsService {
       throw new NotFoundException(`Project with ID '${projectId}' not found`);
     }
 
-    if (dto.userId === leaderId) {
+    const inviteeId = dto.userId || dto.targetUserId;
+    if (!inviteeId) {
+      throw new BadRequestException('userId is required');
+    }
+
+    if (inviteeId === leaderId) {
       throw new BadRequestException('You cannot invite yourself');
     }
 
@@ -885,22 +890,22 @@ export class ProjectsService {
       throw new ForbiddenException('Only a project leader can invite members');
     }
 
-    if (project.maxMembers && project._count.members >= project.maxMembers) {
+    if (project.maxMembers && (project._count?.members ?? 0) >= project.maxMembers) {
       throw new ConflictException('Project team is already full');
     }
 
     const targetUser = await this.prisma.user.findUnique({
-      where: { id: dto.userId },
+      where: { id: inviteeId },
     });
     if (!targetUser) {
-      throw new NotFoundException(`User with ID '${dto.userId}' not found`);
+      throw new NotFoundException(`User with ID '${inviteeId}' not found`);
     }
 
     const existingMember = await this.prisma.projectMember.findUnique({
       where: {
         projectId_userId: {
           projectId,
-          userId: dto.userId,
+          userId: inviteeId,
         },
       },
     });
@@ -920,7 +925,7 @@ export class ProjectsService {
         },
       });
 
-      await this.notificationsService.notifyUser(dto.userId, {
+      await this.notificationsService.notifyUser(inviteeId, {
         title: 'Project Invitation',
         body: `You have been invited to join project ${project.title}`,
         type: 'PROJECT_INVITE',
@@ -933,13 +938,13 @@ export class ProjectsService {
     const created = await this.prisma.projectMember.create({
       data: {
         projectId,
-        userId: dto.userId,
+        userId: inviteeId,
         role: dto.role ?? ProjectRole.MEMBER,
         status: MemberStatus.PENDING,
       },
     });
 
-    await this.notificationsService.notifyUser(dto.userId, {
+    await this.notificationsService.notifyUser(inviteeId, {
       title: 'Project Invitation',
       body: `You have been invited to join project ${project.title}`,
       type: 'PROJECT_INVITE',

@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { MatchingService } from './matching.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, ForbiddenException } from '@nestjs/common';
 import { ExperienceLevel, MemberStatus } from '@prisma/client';
 
 describe('MatchingService', () => {
@@ -40,6 +40,34 @@ describe('MatchingService', () => {
       await expect(
         service.getRecommendations('non-existent-proj'),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should allow non-creator to view recommendations if project status is OPEN', async () => {
+      mockPrismaService.project.findUnique.mockResolvedValue({
+        id: 'proj-open',
+        creatorId: 'creator-user',
+        status: 'OPEN',
+        requiredSkills: [],
+        members: [],
+      });
+      mockPrismaService.profile.findMany.mockResolvedValue([]);
+
+      const result = await service.getRecommendations('proj-open', 'other-user');
+      expect(result).toEqual([]);
+    });
+
+    it('should throw ForbiddenException if requester is not creator/leader when project is not OPEN', async () => {
+      mockPrismaService.project.findUnique.mockResolvedValue({
+        id: 'proj-closed',
+        creatorId: 'creator-user',
+        status: 'IN_PROGRESS',
+        requiredSkills: [],
+        members: [{ userId: 'other-user', role: 'MEMBER', status: 'ACCEPTED' }],
+      });
+
+      await expect(
+        service.getRecommendations('proj-closed', 'other-user'),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('should exclude project creator and accepted members from recommendations', async () => {
