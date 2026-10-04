@@ -97,7 +97,8 @@ export const MatchingScreen: React.FC<{ navigation?: any; route?: any }> = ({
 
   const initialTarget = getInitialTarget();
   const [activeTarget, setActiveTarget] = useState<string>(initialTarget);
-  const [selectedSkillTab, setSelectedSkillTab] = useState<string>('All');
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [matchMode, setMatchMode] = useState<'any' | 'all'>('any');
   const [candidates, setCandidates] = useState<MatchingCandidate[]>([]);
   const [screenState, setScreenState] = useState<ScreenState>('loading');
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -236,9 +237,24 @@ export const MatchingScreen: React.FC<{ navigation?: any; route?: any }> = ({
   const handleSelectProject = (proj: Project) => {
     setSelectedProject(proj);
     setActiveTarget(proj.id);
-    setSelectedSkillTab('All');
+    setSelectedSkills([]);
     setIsProjectPickerOpen(false);
     persistProjectId(proj.id);
+  };
+
+  const handleToggleSkill = (skill: string) => {
+    if (skill === 'All') {
+      setSelectedSkills([]);
+      return;
+    }
+    setSelectedSkills((prev) => {
+      const exists = prev.some((s) => s.toLowerCase() === skill.toLowerCase());
+      if (exists) {
+        return prev.filter((s) => s.toLowerCase() !== skill.toLowerCase());
+      } else {
+        return [...prev, skill];
+      }
+    });
   };
 
   const availableSkills = useMemo(() => {
@@ -289,6 +305,20 @@ export const MatchingScreen: React.FC<{ navigation?: any; route?: any }> = ({
     return false;
   }, []);
 
+  const getCandidateMatchedSkillsCount = useCallback(
+    (candidate: MatchingCandidate, skills: string[]): number => {
+      if (skills.length === 0) return 0;
+      let count = 0;
+      for (const skill of skills) {
+        if (candidateHasSkill(candidate, skill)) {
+          count++;
+        }
+      }
+      return count;
+    },
+    [candidateHasSkill]
+  );
+
   const getCandidateCountForSkill = useCallback(
     (skill: string) => {
       if (skill === 'All') return candidates.length;
@@ -298,11 +328,29 @@ export const MatchingScreen: React.FC<{ navigation?: any; route?: any }> = ({
   );
 
   const filteredCandidates = useMemo(() => {
-    if (selectedSkillTab === 'All') {
+    if (selectedSkills.length === 0) {
       return candidates;
     }
-    return candidates.filter((c) => candidateHasSkill(c, selectedSkillTab));
-  }, [candidates, selectedSkillTab, candidateHasSkill]);
+
+    if (matchMode === 'all') {
+      // Require every selected skill
+      return candidates.filter((c) =>
+        selectedSkills.every((skill) => candidateHasSkill(c, skill))
+      );
+    } else {
+      // Match any of the selected skills, sorted so candidates matching MORE selected skills appear first
+      return candidates
+        .filter((c) => selectedSkills.some((skill) => candidateHasSkill(c, skill)))
+        .sort((a, b) => {
+          const aCount = getCandidateMatchedSkillsCount(a, selectedSkills);
+          const bCount = getCandidateMatchedSkillsCount(b, selectedSkills);
+          if (bCount !== aCount) {
+            return bCount - aCount;
+          }
+          return (b.matchScore || 0) - (a.matchScore || 0);
+        });
+    }
+  }, [candidates, selectedSkills, matchMode, candidateHasSkill, getCandidateMatchedSkillsCount]);
 
   const getInviteProjectId = useCallback((): string => {
     if (selectedProject?.id) return selectedProject.id;
@@ -480,7 +528,7 @@ export const MatchingScreen: React.FC<{ navigation?: any; route?: any }> = ({
               )}
             </View>
 
-            {/* Skill Filter Tabs for sorting & navigation */}
+            {/* Skill Filter Tabs for multi-skill sorting & navigation */}
             <View style={{ marginTop: spacing.md }}>
               <View
                 style={{
@@ -490,25 +538,90 @@ export const MatchingScreen: React.FC<{ navigation?: any; route?: any }> = ({
                   marginBottom: 8,
                 }}
               >
-                <Text
-                  style={[
-                    styles.skillTabsHeader,
-                    { color: colors.onSurfaceVariant },
-                  ]}
-                >
-                  Filter by Skill:
-                </Text>
-                {selectedSkillTab !== 'All' && (
-                  <TouchableOpacity
-                    onPress={() => setSelectedSkillTab('All')}
-                    accessibilityRole="button"
-                    accessibilityLabel="Reset to all skills"
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text
+                    style={[
+                      styles.skillTabsHeader,
+                      { color: colors.onSurfaceVariant },
+                    ]}
                   >
-                    <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '600' }}>
-                      Reset to All ({candidates.length})
-                    </Text>
-                  </TouchableOpacity>
-                )}
+                    Filter by Skills:
+                  </Text>
+                  {selectedSkills.length > 0 && (
+                    <Badge
+                      label={`${selectedSkills.length} selected`}
+                      variant="primary"
+                      style={{ marginLeft: 8 }}
+                    />
+                  )}
+                </View>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  {selectedSkills.length > 1 && (
+                    <View
+                      style={[
+                        styles.matchModeContainer,
+                        { backgroundColor: colors.surfaceVariant, borderColor: colors.outlineVariant },
+                      ]}
+                    >
+                      <TouchableOpacity
+                        onPress={() => setMatchMode('any')}
+                        style={[
+                          styles.matchModeBtn,
+                          matchMode === 'any' && { backgroundColor: colors.primary },
+                        ]}
+                        accessibilityRole="button"
+                        accessibilityLabel="Match Any selected skill"
+                      >
+                        <Text
+                          style={[
+                            styles.matchModeText,
+                            {
+                              color: matchMode === 'any' ? colors.onPrimary : colors.onSurfaceVariant,
+                              fontWeight: matchMode === 'any' ? '700' : '500',
+                            },
+                          ]}
+                        >
+                          Any
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => setMatchMode('all')}
+                        style={[
+                          styles.matchModeBtn,
+                          matchMode === 'all' && { backgroundColor: colors.primary },
+                        ]}
+                        accessibilityRole="button"
+                        accessibilityLabel="Require All selected skills"
+                      >
+                        <Text
+                          style={[
+                            styles.matchModeText,
+                            {
+                              color: matchMode === 'all' ? colors.onPrimary : colors.onSurfaceVariant,
+                              fontWeight: matchMode === 'all' ? '700' : '500',
+                            },
+                          ]}
+                        >
+                          All
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {selectedSkills.length > 0 && (
+                    <TouchableOpacity
+                      onPress={() => setSelectedSkills([])}
+                      accessibilityRole="button"
+                      accessibilityLabel="Clear skill filters"
+                      style={{ marginLeft: 8 }}
+                    >
+                      <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '600' }}>
+                        Clear ({selectedSkills.length})
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
 
               <ScrollView
@@ -517,13 +630,16 @@ export const MatchingScreen: React.FC<{ navigation?: any; route?: any }> = ({
                 contentContainerStyle={styles.skillTabsContent}
               >
                 {availableSkills.map((skill) => {
-                  const isSelected = selectedSkillTab.toLowerCase() === skill.toLowerCase();
+                  const isAll = skill === 'All';
+                  const isSelected = isAll
+                    ? selectedSkills.length === 0
+                    : selectedSkills.some((s) => s.toLowerCase() === skill.toLowerCase());
                   const count = getCandidateCountForSkill(skill);
 
                   return (
                     <TouchableOpacity
                       key={skill}
-                      onPress={() => setSelectedSkillTab(skill)}
+                      onPress={() => handleToggleSkill(skill)}
                       accessibilityRole="tab"
                       accessibilityLabel={`Filter by skill ${skill}`}
                       style={[
@@ -543,7 +659,8 @@ export const MatchingScreen: React.FC<{ navigation?: any; route?: any }> = ({
                           },
                         ]}
                       >
-                        {skill === 'All' ? 'All Skills' : skill}
+                        {!isAll && isSelected ? '✓ ' : ''}
+                        {isAll ? 'All Skills' : skill}
                       </Text>
                       <View
                         style={[
@@ -597,25 +714,53 @@ export const MatchingScreen: React.FC<{ navigation?: any; route?: any }> = ({
                     { color: colors.onSurface, fontSize: typography.titleMedium.fontSize },
                   ]}
                 >
-                  Recommended ({filteredCandidates.length}{selectedSkillTab !== 'All' ? ` for ${selectedSkillTab}` : ''})
+                  Recommended ({filteredCandidates.length}
+                  {selectedSkills.length > 0
+                    ? ` • ${selectedSkills.length} skill${selectedSkills.length > 1 ? 's' : ''} filtered (${matchMode === 'all' ? 'All' : 'Any'})`
+                    : ''})
                 </Text>
               </View>
 
               {filteredCandidates.length === 0 ? (
                 <Card style={[styles.emptySkillFilterCard, { backgroundColor: colors.surfaceVariant }]}>
                   <Text style={[styles.emptySkillFilterTitle, { color: colors.onSurface }]}>
-                    No candidates found with skill "{selectedSkillTab}"
+                    No candidates found matching {matchMode === 'all' ? 'all' : 'any'} of the selected skills
                   </Text>
                   <Text style={[styles.emptySkillFilterSubtitle, { color: colors.onSurfaceVariant, marginTop: 4 }]}>
-                    None of the recommended candidates for this project currently list this skill.
+                    Selected skills: {selectedSkills.join(', ')}
                   </Text>
+                  {matchMode === 'all' && (
+                    <TouchableOpacity
+                      style={[styles.resetSkillButton, { backgroundColor: colors.primary, marginTop: spacing.md }]}
+                      onPress={() => setMatchMode('any')}
+                      accessibilityRole="button"
+                      accessibilityLabel="Switch to Match Any"
+                    >
+                      <Text style={{ color: colors.onPrimary, fontWeight: '700' }}>
+                        Try "Match Any" Filter
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                   <TouchableOpacity
-                    style={[styles.resetSkillButton, { backgroundColor: colors.primary, marginTop: spacing.md }]}
-                    onPress={() => setSelectedSkillTab('All')}
+                    style={[
+                      styles.resetSkillButton,
+                      {
+                        backgroundColor: matchMode === 'all' ? colors.surface : colors.primary,
+                        borderColor: colors.outlineVariant,
+                        borderWidth: matchMode === 'all' ? 1 : 0,
+                        marginTop: spacing.sm,
+                      },
+                    ]}
+                    onPress={() => setSelectedSkills([])}
                     accessibilityRole="button"
                     accessibilityLabel="Show all candidates"
                   >
-                    <Text style={{ color: colors.onPrimary, fontWeight: '700' }}>
+                    <Text
+                      style={{
+                        color: matchMode === 'all' ? colors.onSurface : colors.onPrimary,
+                        fontWeight: '700',
+                      }}
+                    >
                       Show All Candidates ({candidates.length})
                     </Text>
                   </TouchableOpacity>
@@ -728,24 +873,36 @@ export const MatchingScreen: React.FC<{ navigation?: any; route?: any }> = ({
                   {/* Shared skills */}
                   {skillsList.length > 0 && (
                     <View style={{ marginTop: spacing.sm }}>
-                      <Text
-                        style={[
-                          styles.breakdownHeader,
-                          { color: colors.onSurfaceVariant },
-                        ]}
-                      >
-                        Shared skills
-                      </Text>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text
+                          style={[
+                            styles.breakdownHeader,
+                            { color: colors.onSurfaceVariant },
+                          ]}
+                        >
+                          Shared skills
+                        </Text>
+                        {selectedSkills.length > 0 && (
+                          <Text style={{ fontSize: 11, color: colors.primary, fontWeight: '600' }}>
+                            {getCandidateMatchedSkillsCount(candidate, selectedSkills)}/{selectedSkills.length} selected matched
+                          </Text>
+                        )}
+                      </View>
                       <View style={[styles.chipRow, { marginTop: 4 }]}>
-                        {skillsList.map((skill) => (
-                          <Chip
-                            key={skill}
-                            label={skill}
-                            selected
-                            variant="primary"
-                            style={{ marginRight: 6, marginBottom: 4 }}
-                          />
-                        ))}
+                        {skillsList.map((skill) => {
+                          const isSkillSelected = selectedSkills.some(
+                            (s) => s.toLowerCase() === skill.toLowerCase()
+                          );
+                          return (
+                            <Chip
+                              key={skill}
+                              label={isSkillSelected ? `✓ ${skill}` : skill}
+                              selected={isSkillSelected}
+                              variant={isSkillSelected ? 'primary' : 'secondary'}
+                              style={{ marginRight: 6, marginBottom: 4 }}
+                            />
+                          );
+                        })}
                       </View>
                     </View>
                   )}
@@ -840,22 +997,6 @@ export const MatchingScreen: React.FC<{ navigation?: any; route?: any }> = ({
                         disabled={status === 'inviting'}
                       />
                     )}
-
-                    <Button
-                      title="View Profile"
-                      variant="outline"
-                      onPress={() => {
-                        if (navigation) {
-                          navigation.navigate('UserProfile', {
-                            userId: targetUserId,
-                            userName: candidate.fullName,
-                            projectId: getInviteProjectId(),
-                            invited: status === 'invited',
-                          });
-                        }
-                      }}
-                      style={{ marginTop: 8 }}
-                    />
                   </View>
                 </Card>
               );
@@ -1347,5 +1488,18 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 8,
+  },
+  matchModeContainer: {
+    flexDirection: 'row',
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  matchModeBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  matchModeText: {
+    fontSize: 11,
   },
 });

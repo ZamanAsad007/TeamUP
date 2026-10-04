@@ -240,5 +240,42 @@ describe('Skill-Based Matching (Phase 3 - Feature 2)', () => {
     expect(getByText('Alice Johnson')).toBeTruthy();
     expect(getByText('Bob Smith')).toBeTruthy();
   });
+
+  it('enables multiple skill selection in filter and handles match mode', async () => {
+    (api.get as jest.Mock).mockResolvedValueOnce(mockCandidates);
+
+    const { findByText, getByText, queryByText, getByLabelText } = render(
+      <ThemeProvider>
+        <MatchingScreen />
+      </ThemeProvider>
+    );
+
+    expect(await findByText('Alice Johnson')).toBeTruthy();
+    expect(getByText('Bob Smith')).toBeTruthy();
+
+    // Select TypeScript (Alice has it, Bob does not)
+    fireEvent.press(getByLabelText('Filter by skill TypeScript'));
+    expect(getByText('Alice Johnson')).toBeTruthy();
+    expect(queryByText('Bob Smith')).toBeNull();
+
+    // Select Figma as well (Bob has it, Alice does not)
+    fireEvent.press(getByLabelText('Filter by skill Figma'));
+
+    // In default 'any' mode: both Alice (has TypeScript) and Bob (has Figma) are visible
+    expect(getByText('Alice Johnson')).toBeTruthy();
+    expect(getByText('Bob Smith')).toBeTruthy();
+    expect(getByText('2 selected')).toBeTruthy();
+
+    // Switch to 'all' mode: neither has BOTH TypeScript and Figma
+    fireEvent.press(getByLabelText('Require All selected skills'));
+    expect(queryByText('Alice Johnson')).toBeNull();
+    expect(queryByText('Bob Smith')).toBeNull();
+    expect(getByText(/No candidates found matching all of the selected skills/i)).toBeTruthy();
+
+    // Clear filters
+    fireEvent.press(getByLabelText('Clear skill filters'));
+    expect(getByText('Alice Johnson')).toBeTruthy();
+    expect(getByText('Bob Smith')).toBeTruthy();
+  });
 });
 
