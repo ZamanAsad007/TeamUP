@@ -42,32 +42,32 @@ describe('MatchingService', () => {
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('should allow non-creator to view recommendations if project status is OPEN', async () => {
+    it('should throw ForbiddenException if requester is not creator or leader', async () => {
       mockPrismaService.project.findUnique.mockResolvedValue({
-        id: 'proj-open',
+        id: 'proj-1',
         creatorId: 'creator-user',
         status: 'OPEN',
-        requiredSkills: [],
-        members: [],
-      });
-      mockPrismaService.profile.findMany.mockResolvedValue([]);
-
-      const result = await service.getRecommendations('proj-open', 'other-user');
-      expect(result).toEqual([]);
-    });
-
-    it('should throw ForbiddenException if requester is not creator/leader when project is not OPEN', async () => {
-      mockPrismaService.project.findUnique.mockResolvedValue({
-        id: 'proj-closed',
-        creatorId: 'creator-user',
-        status: 'IN_PROGRESS',
         requiredSkills: [],
         members: [{ userId: 'other-user', role: 'MEMBER', status: 'ACCEPTED' }],
       });
 
       await expect(
-        service.getRecommendations('proj-closed', 'other-user'),
+        service.getRecommendations('proj-1', 'other-user'),
       ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should allow accepted leader to view recommendations', async () => {
+      mockPrismaService.project.findUnique.mockResolvedValue({
+        id: 'proj-1',
+        creatorId: 'creator-user',
+        status: 'OPEN',
+        requiredSkills: [],
+        members: [{ userId: 'leader-user', role: 'LEADER', status: 'ACCEPTED' }],
+      });
+      mockPrismaService.profile.findMany.mockResolvedValue([]);
+
+      const result = await service.getRecommendations('proj-1', 'leader-user');
+      expect(result).toEqual([]);
     });
 
     it('should exclude project creator and accepted members from recommendations', async () => {

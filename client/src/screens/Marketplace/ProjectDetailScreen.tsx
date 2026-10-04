@@ -313,7 +313,17 @@ export const ProjectDetailScreen: React.FC<ProjectDetailScreenProps> = ({ route,
 
               <Card style={{ marginTop: spacing.xs }}>
                 {project.creator && (
-                  <View style={styles.memberRow}>
+                  <TouchableOpacity
+                    style={styles.memberRow}
+                    activeOpacity={0.7}
+                    onPress={() =>
+                      navigation?.navigate('UserProfile', {
+                        userId: project.creatorId,
+                        userName: project.creator?.profile?.fullName || project.creator?.email || 'Project Leader',
+                        projectId: project.id,
+                      })
+                    }
+                  >
                     <View style={[styles.avatar, { backgroundColor: colors.primarySoft }]}>
                       <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 16 }}>
                         {(project.creator.profile?.fullName || project.creator.email || 'L').charAt(0).toUpperCase()}
@@ -326,32 +336,61 @@ export const ProjectDetailScreen: React.FC<ProjectDetailScreenProps> = ({ route,
                       <Text style={[typography.bodySmall, { color: colors.textMuted }]}>
                         Project Leader
                       </Text>
+                      <Text style={[typography.bodySmall, { color: colors.primary, textDecorationLine: 'underline', marginTop: 2 }]}>
+                        View Profile →
+                      </Text>
                     </View>
                     <Badge label="Leader" variant="primary" />
-                  </View>
+                  </TouchableOpacity>
                 )}
 
                 {project.members &&
                   project.members
                     .filter((m) => m.userId !== project.creatorId)
-                    .map((m, idx) => (
-                      <View key={m.id || idx.toString()} style={[styles.memberRow, { marginTop: 12 }]}>
-                        <View style={[styles.avatar, { backgroundColor: colors.secondarySoft }]}>
-                          <Text style={{ color: colors.secondary, fontWeight: '700', fontSize: 16 }}>
-                            {m.role ? m.role.charAt(0).toUpperCase() : 'M'}
-                          </Text>
-                        </View>
-                        <View style={{ flex: 1, marginLeft: 12 }}>
-                          <Text style={[typography.body, { color: colors.text, fontWeight: '600' }]}>
-                            Member #{idx + 1}
-                          </Text>
-                          <Text style={[typography.bodySmall, { color: colors.textMuted }]}>
-                            {m.role || 'Contributor'}
-                          </Text>
-                        </View>
-                        <Badge label={m.status} variant={m.status === 'ACCEPTED' ? 'secondary' : 'tertiary'} />
-                      </View>
-                    ))}
+                    .map((m, idx) => {
+                      const memberName = m.user?.profile?.fullName || m.user?.email || `Member #${idx + 1}`;
+                      return (
+                        <TouchableOpacity
+                          key={m.id || idx.toString()}
+                          style={[styles.memberRow, { marginTop: 12 }]}
+                          activeOpacity={0.7}
+                          onPress={() => {
+                            if (m.userId) {
+                              navigation?.navigate('UserProfile', {
+                                userId: m.userId,
+                                userName: memberName,
+                                projectId: project.id,
+                              });
+                            }
+                          }}
+                        >
+                          <View style={[styles.avatar, { backgroundColor: colors.secondarySoft }]}>
+                            <Text style={{ color: colors.secondary, fontWeight: '700', fontSize: 16 }}>
+                              {m.role ? m.role.charAt(0).toUpperCase() : 'M'}
+                            </Text>
+                          </View>
+                          <View style={{ flex: 1, marginLeft: 12 }}>
+                            <Text style={[typography.body, { color: colors.text, fontWeight: '600' }]}>
+                              {memberName}
+                            </Text>
+                            <Text style={[typography.bodySmall, { color: colors.textMuted }]}>
+                              {m.role || 'Contributor'}
+                            </Text>
+                            {m.userId && (
+                              <Text
+                                style={[
+                                  typography.bodySmall,
+                                  { color: colors.primary, textDecorationLine: 'underline', marginTop: 2 },
+                                ]}
+                              >
+                                View Profile →
+                              </Text>
+                            )}
+                          </View>
+                          <Badge label={m.status} variant={m.status === 'ACCEPTED' ? 'secondary' : 'tertiary'} />
+                        </TouchableOpacity>
+                      );
+                    })}
               </Card>
             </View>
 

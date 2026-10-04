@@ -21,7 +21,7 @@ jobs:
     timeout-minutes: 35
 
     env:
-      GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx3072m -XX:MaxMetaspaceSize=512m"
+      GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx3072m -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError"
 
     steps:
       - name: Checkout Code
@@ -31,6 +31,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+          cache-dependency-path: ./client/package-lock.json
 
       - name: Setup Java 17 (Temurin)
         uses: actions/setup-java@v4
@@ -45,7 +47,7 @@ jobs:
 
       - name: Install Client Dependencies
         working-directory: ./client
-        run: npm install --legacy-peer-deps
+        run: npm ci --legacy-peer-deps
 
       - name: Configure Environment Variables
         working-directory: ./client
@@ -74,14 +76,17 @@ jobs:
 
       - name: Build Android Release APK
         working-directory: ./client/android
-        run: ./gradlew assembleRelease --no-daemon
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
 
       - name: Prepare APK Asset
         run: |
           mkdir -p release-assets
           echo "Listing all built APK files:"
           find client/android/app/build/outputs/apk/ -type f -name "*.apk"
-          APK_PATH=$(find client/android/app/build/outputs/apk/ -type f -name "*.apk" | head -n 1)
+          APK_PATH=$(find client/android/app/build/outputs/apk/release/ -type f -name "*.apk" 2>/dev/null | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            APK_PATH=$(find client/android/app/build/outputs/apk/ -type f -name "*.apk" | head -n 1)
+          fi
           if [ -z "$APK_PATH" ]; then
             echo "Error: No APK file found in build outputs!"
             exit 1

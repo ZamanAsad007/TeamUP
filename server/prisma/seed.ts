@@ -370,6 +370,7 @@ async function main() {
       where: { email: spec.email },
       update: {
         password: hashedPassword,
+        isVerified: true,
         profile: {
           upsert: {
             create: {
@@ -401,6 +402,7 @@ async function main() {
       create: {
         email: spec.email,
         password: hashedPassword,
+        isVerified: true,
         profile: {
           create: {
             fullName: spec.fullName,

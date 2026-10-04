@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,8 @@ import {
   TouchableOpacity,
   Platform,
   StatusBar,
+  Modal,
+  Alert,
 } from 'react-native';
 import { useSafeInsets } from '../../utils/useSafeInsets';
 import { useTheme } from '../../theme/ThemeContext';
@@ -18,7 +20,9 @@ import { Chip } from '../../components/Chip';
 import { Button } from '../../components/Button';
 import { StateWrapper, ScreenState } from '../../components/StateWrapper';
 import { api } from '../../api/client';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { useAuth } from '../../context/AuthContext';
+import { projectService, Project } from '../../services/projectService';
 
 export interface MatchingCandidate {
   id: string;
@@ -53,7 +57,12 @@ const POPULAR_SKILLS = [
   'Docker',
 ];
 
-export const MatchingScreen: React.FC<{ navigation?: any }> = ({ navigation: propNavigation }) => {
+const MATCHING_PROJECT_KEY = 'teamup_matching_selected_project_id';
+
+export const MatchingScreen: React.FC<{ navigation?: any; route?: any }> = ({
+  navigation: propNavigation,
+  route: propRoute,
+}) => {
   const { colors, typography, spacing } = useTheme();
   let navigationHook: any;
   try {
@@ -63,8 +72,33 @@ export const MatchingScreen: React.FC<{ navigation?: any }> = ({ navigation: pro
   }
   const navigation = propNavigation || navigationHook;
 
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [activeTarget, setActiveTarget] = useState<string>('project-1');
+  let routeHook: any;
+  try {
+    routeHook = useRoute();
+  } catch {
+    // Graceful fallback for non-navigation contexts
+  }
+  const route = propRoute || routeHook;
+
+  const { user } = useAuth();
+  const [leadingProjects, setLeadingProjects] = useState<Project[]>([]);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [isProjectPickerOpen, setIsProjectPickerOpen] = useState<boolean>(false);
+  const [loadingProjects, setLoadingProjects] = useState<boolean>(false);
+
+  const getInitialTarget = () => {
+    if (route?.params?.projectId) return route.params.projectId;
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const saved = window.sessionStorage?.getItem(MATCHING_PROJECT_KEY);
+      if (saved && saved !== '__SKILL_SEARCH__') return saved;
+    }
+    return 'project-1';
+  };
+
+  const initialTarget = getInitialTarget();
+  const [activeTarget, setActiveTarget] = useState<string>(initialTarget);
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [matchMode, setMatchMode] = useState<'any' | 'all'>('any');
   const [candidates, setCandidates] = useState<MatchingCandidate[]>([]);
   const [screenState, setScreenState] = useState<ScreenState>('loading');
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -108,160 +142,241 @@ export const MatchingScreen: React.FC<{ navigation?: any }> = ({ navigation: pro
         err?.statusCode === 403 ||
         (typeof err?.message === 'string' &&
           (err.message.toLowerCase().includes('owner') ||
-            err.message.toLowerCase().includes('forbidden')));
+            err.message.toLowerCase().includes('forbidden') ||
+            err.message.toLowerCase().includes('leader')));
 
-      const isNotFound =
-        err?.code === 'NOT_FOUND' ||
-        err?.status === 404 ||
-        err?.statusCode === 404 ||
-        (typeof err?.message === 'string' &&
-          err.message.toLowerCase().includes('not found'));
-
-      if ((isForbidden || isNotFound) && trimmedTarget.startsWith('project-')) {
-        // Graceful automatic recovery: fall back to skill-based matching
-        const fallbackSkill = 'React Native';
-        setActiveTarget(fallbackSkill);
-        setSearchQuery(fallbackSkill);
-        try {
-          const fallbackData = await api.get<MatchingCandidate[]>(
-            `/projects/${encodeURIComponent(fallbackSkill)}/recommendations`
-          );
-          const candidateList = Array.isArray(fallbackData) ? fallbackData : [];
-          setCandidates(candidateList);
-          setScreenState(candidateList.length === 0 ? 'empty' : 'populated');
-          return;
-        } catch {
-          // If fallback fails, fall through to error handling
-        }
-      }
-
-      const msg = err?.message || 'Failed to fetch teammate recommendations.';
-      const code = err?.code || (isForbidden ? 'FORBIDDEN' : undefined);
+      const msg = isForbidden
+        ? 'Only the project leader can view recommendations for this project.'
+        : err?.message || 'Failed to fetch teammate recommendations.';
+      const code = isForbidden ? 'FORBIDDEN' : err?.code;
       setErrorMessage(msg);
       setErrorCode(code);
       setScreenState('error');
     }
   }, []);
 
-  useEffect(() => {
-    let isMounted = true;
-
-    async function init() {
-      const trimmedTarget = activeTarget.trim();
-      if (!trimmedTarget) return;
-
-      setScreenState('loading');
-      setErrorMessage('');
-      setErrorCode(undefined);
-
+  const persistProjectId = (projId: string) => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
       try {
-        const data = await api.get<MatchingCandidate[]>(
-          `/projects/${encodeURIComponent(trimmedTarget)}/recommendations`
-        );
-        if (!isMounted) return;
-
-        const candidateList = Array.isArray(data) ? data : [];
-        setCandidates(candidateList);
-
-        const initialStatuses: Record<string, InvitationStatus> = {};
-        candidateList.forEach((candidate) => {
-          const uid = candidate.userId || candidate.id;
-          if (candidate.invited) {
-            initialStatuses[uid] = 'invited';
-          }
-        });
-        setInviteStatuses((prev) => ({ ...initialStatuses, ...prev }));
-        setScreenState(candidateList.length === 0 ? 'empty' : 'populated');
-      } catch (err: any) {
-        if (!isMounted) return;
-
-        const isForbidden =
-          err?.code === 'FORBIDDEN' ||
-          err?.status === 403 ||
-          err?.statusCode === 403 ||
-          (typeof err?.message === 'string' &&
-            (err.message.toLowerCase().includes('owner') ||
-              err.message.toLowerCase().includes('forbidden')));
-
-        const isNotFound =
-          err?.code === 'NOT_FOUND' ||
-          err?.status === 404 ||
-          err?.statusCode === 404 ||
-          (typeof err?.message === 'string' &&
-            err.message.toLowerCase().includes('not found'));
-
-        if ((isForbidden || isNotFound) && trimmedTarget.startsWith('project-')) {
-          // Graceful fallback to skill-based matching
-          const fallbackSkill = 'React Native';
-          setActiveTarget(fallbackSkill);
-          setSearchQuery(fallbackSkill);
-          try {
-            const fallbackData = await api.get<MatchingCandidate[]>(
-              `/projects/${encodeURIComponent(fallbackSkill)}/recommendations`
-            );
-            if (!isMounted) return;
-            const candidateList = Array.isArray(fallbackData) ? fallbackData : [];
-            setCandidates(candidateList);
-            const initialStatuses: Record<string, InvitationStatus> = {};
-            candidateList.forEach((candidate) => {
-              const uid = candidate.userId || candidate.id;
-              if (candidate.invited) {
-                initialStatuses[uid] = 'invited';
-              }
-            });
-            setInviteStatuses((prev) => ({ ...initialStatuses, ...prev }));
-            setScreenState(candidateList.length === 0 ? 'empty' : 'populated');
-            return;
-          } catch {
-            // fall through to error state
-          }
-        }
-
-        const msg = err?.message || 'Failed to fetch teammate recommendations.';
-        const code = err?.code || (isForbidden ? 'FORBIDDEN' : undefined);
-        setErrorMessage(msg);
-        setErrorCode(code);
-        setScreenState('error');
+        window.sessionStorage?.setItem(MATCHING_PROJECT_KEY, projId);
+      } catch {
+        // ignore storage errors
       }
     }
+  };
 
-    init();
+  const fetchUserProjects = useCallback(async () => {
+    try {
+      setLoadingProjects(true);
+      const data = await projectService.getMyProjects();
+      if (Array.isArray(data)) {
+        const currentUserId = user?.userId || user?.id;
+        const leaderList = data.filter((p: Project) => {
+          if (!currentUserId) return true;
+          const isCreator = p.creatorId === currentUserId;
+          const isLeaderMember = p.members?.some(
+            (m) => m.userId === currentUserId && m.role === 'LEADER' && m.status === 'ACCEPTED'
+          );
+          return isCreator || isLeaderMember;
+        });
+        setLeadingProjects(leaderList);
 
-    return () => {
-      isMounted = false;
-    };
-  }, [activeTarget]);
+        const savedProjId =
+          Platform.OS === 'web' && typeof window !== 'undefined'
+            ? window.sessionStorage?.getItem(MATCHING_PROJECT_KEY)
+            : null;
+
+        const routeProjectId = route?.params?.projectId;
+        const targetProjectId =
+          routeProjectId || (savedProjId && savedProjId !== '__SKILL_SEARCH__' ? savedProjId : null);
+
+        if (targetProjectId) {
+          const match = leaderList.find((p) => p.id === targetProjectId);
+          if (match) {
+            setSelectedProject(match);
+            setActiveTarget(match.id);
+          } else {
+            setActiveTarget(targetProjectId);
+          }
+        } else if (leaderList.length > 0) {
+          setSelectedProject(leaderList[0]);
+          setActiveTarget(leaderList[0].id);
+        }
+      }
+    } catch {
+      // Graceful degradation when offline or unauthenticated
+    } finally {
+      setLoadingProjects(false);
+    }
+  }, [user, route?.params?.projectId]);
+
+  useEffect(() => {
+    const currentUserId = user?.userId || user?.id;
+    if (currentUserId) {
+      fetchUserProjects();
+    }
+  }, [user?.userId, user?.id, fetchUserProjects]);
+
+  useEffect(() => {
+    loadRecommendations(activeTarget);
+  }, [activeTarget, loadRecommendations]);
 
   const onRefresh = async () => {
     setRefreshing(true);
     try {
+      const currentUserId = user?.userId || user?.id;
+      if (currentUserId) {
+        await fetchUserProjects();
+      }
       await loadRecommendations(activeTarget);
     } finally {
       setRefreshing(false);
     }
   };
 
-  const handleSearch = () => {
-    const trimmed = searchQuery.trim();
-    if (trimmed) {
-      setActiveTarget(trimmed);
-    }
+  const handleSelectProject = (proj: Project) => {
+    setSelectedProject(proj);
+    setActiveTarget(proj.id);
+    setSelectedSkills([]);
+    setIsProjectPickerOpen(false);
+    persistProjectId(proj.id);
   };
 
-  const handleSelectSkill = (skill: string) => {
-    setSearchQuery(skill);
-    setActiveTarget(skill);
+  const handleToggleSkill = (skill: string) => {
+    if (skill === 'All') {
+      setSelectedSkills([]);
+      return;
+    }
+    setSelectedSkills((prev) => {
+      const exists = prev.some((s) => s.toLowerCase() === skill.toLowerCase());
+      if (exists) {
+        return prev.filter((s) => s.toLowerCase() !== skill.toLowerCase());
+      } else {
+        return [...prev, skill];
+      }
+    });
   };
+
+  const availableSkills = useMemo(() => {
+    const set = new Set<string>();
+
+    // 1. Add required skills from selectedProject
+    if (selectedProject?.requiredSkills && Array.isArray(selectedProject.requiredSkills)) {
+      selectedProject.requiredSkills.forEach((req) => {
+        const name = req.skill?.name || req.skillName;
+        if (name && name.trim()) set.add(name.trim());
+      });
+    }
+
+    // 2. Add matchingSkills and profile skills from loaded candidates
+    candidates.forEach((c) => {
+      if (Array.isArray(c.matchingSkills)) {
+        c.matchingSkills.forEach((s) => {
+          if (s && s.trim()) set.add(s.trim());
+        });
+      }
+      if (Array.isArray(c.skills)) {
+        c.skills.forEach((s) => {
+          if (s.skillName && s.skillName.trim()) set.add(s.skillName.trim());
+        });
+      }
+    });
+
+    // 3. Fallback popular skills if empty
+    if (set.size === 0) {
+      POPULAR_SKILLS.forEach((s) => set.add(s));
+    }
+
+    return ['All', ...Array.from(set)];
+  }, [selectedProject, candidates]);
+
+  const candidateHasSkill = useCallback((candidate: MatchingCandidate, skill: string): boolean => {
+    if (skill === 'All') return true;
+    const target = skill.toLowerCase().trim();
+    if (candidate.matchingSkills?.some((s) => s.toLowerCase().trim() === target)) {
+      return true;
+    }
+    if (candidate.skills?.some((s) => s.skillName?.toLowerCase().trim() === target)) {
+      return true;
+    }
+    if (candidate.bio?.toLowerCase().includes(target)) {
+      return true;
+    }
+    return false;
+  }, []);
+
+  const getCandidateMatchedSkillsCount = useCallback(
+    (candidate: MatchingCandidate, skills: string[]): number => {
+      if (skills.length === 0) return 0;
+      let count = 0;
+      for (const skill of skills) {
+        if (candidateHasSkill(candidate, skill)) {
+          count++;
+        }
+      }
+      return count;
+    },
+    [candidateHasSkill]
+  );
+
+  const getCandidateCountForSkill = useCallback(
+    (skill: string) => {
+      if (skill === 'All') return candidates.length;
+      return candidates.filter((c) => candidateHasSkill(c, skill)).length;
+    },
+    [candidates, candidateHasSkill]
+  );
+
+  const filteredCandidates = useMemo(() => {
+    if (selectedSkills.length === 0) {
+      return candidates;
+    }
+
+    if (matchMode === 'all') {
+      // Require every selected skill
+      return candidates.filter((c) =>
+        selectedSkills.every((skill) => candidateHasSkill(c, skill))
+      );
+    } else {
+      // Match any of the selected skills, sorted so candidates matching MORE selected skills appear first
+      return candidates
+        .filter((c) => selectedSkills.some((skill) => candidateHasSkill(c, skill)))
+        .sort((a, b) => {
+          const aCount = getCandidateMatchedSkillsCount(a, selectedSkills);
+          const bCount = getCandidateMatchedSkillsCount(b, selectedSkills);
+          if (bCount !== aCount) {
+            return bCount - aCount;
+          }
+          return (b.matchScore || 0) - (a.matchScore || 0);
+        });
+    }
+  }, [candidates, selectedSkills, matchMode, candidateHasSkill, getCandidateMatchedSkillsCount]);
+
+  const getInviteProjectId = useCallback((): string => {
+    if (selectedProject?.id) return selectedProject.id;
+    if (leadingProjects.length > 0) return leadingProjects[0].id;
+    return activeTarget;
+  }, [selectedProject?.id, leadingProjects, activeTarget]);
 
   const handleInvite = async (candidate: MatchingCandidate) => {
     const targetUserId = candidate.userId || candidate.id;
+    const inviteProjectId = getInviteProjectId();
+
+    // If user has multiple leading projects and none is selected, prompt selection
+    if (!selectedProject && leadingProjects.length > 1) {
+      setIsProjectPickerOpen(true);
+      Alert.alert(
+        'Select Project',
+        'Please select which project you would like to invite this candidate to.'
+      );
+      return;
+    }
 
     // Optimistic update: set state to 'inviting' immediately
     setInviteStatuses((prev) => ({ ...prev, [targetUserId]: 'inviting' }));
     setInviteErrors((prev) => ({ ...prev, [targetUserId]: '' }));
 
     try {
-      const inviteProjectId = activeTarget.startsWith('project-') ? activeTarget : 'project-1';
       await api.post(`/projects/${inviteProjectId}/invite`, {
         userId: targetUserId,
         role: 'MEMBER',
@@ -293,152 +408,365 @@ export const MatchingScreen: React.FC<{ navigation?: any }> = ({ navigation: pro
   const topPadding = Platform.OS === 'android' ? Math.max(insets.top, StatusBar.currentHeight || 0) : insets.top;
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={{ paddingBottom: 90 }}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-    >
-      <View style={{ padding: spacing.md, paddingTop: topPadding + spacing.sm }}>
-        {/* Top Header & Project Selector */}
-        <Card style={styles.headerCard}>
-          <View style={styles.titleRow}>
-            <Text
-              style={[
-                styles.title,
-                { color: colors.onSurface, fontSize: typography.headlineMedium.fontSize },
-              ]}
-            >
-              Matching
-            </Text>
-            <Badge label="Skill Matching" variant="primary" />
-          </View>
-
-          <Text
-            style={[
-              styles.subtitle,
-              { color: colors.onSurfaceVariant, marginTop: spacing.xs },
-            ]}
-          >
-            Find teammates for:
-          </Text>
-
-          {/* Project Selector Pill */}
-          <TouchableOpacity
-            style={[
-              styles.projectSelectorPill,
-              {
-                backgroundColor: colors.surfaceVariant,
-                borderColor: colors.outlineVariant,
-                marginTop: spacing.xs,
-              },
-            ]}
-            onPress={() => {
-              const targets = ['React Native', 'TypeScript', 'Node.js', 'Python', 'UI/UX'];
-              const idx = targets.indexOf(activeTarget);
-              const next = idx === -1 || idx === targets.length - 1 ? targets[0] : targets[idx + 1];
-              setActiveTarget(next);
-              setSearchQuery(next);
-            }}
-          >
-            <Text style={[styles.projectSelectorText, { color: colors.onSurface }]}>
-              {activeTarget.startsWith('project-') ? `Project (${activeTarget})` : `Skill: ${activeTarget}`}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Skill Search Bar */}
-          <View style={[styles.projectInputRow, { marginTop: spacing.md }]}>
-            <TextInput
-              style={[
-                styles.input,
-                {
-                  color: colors.onSurface,
-                  backgroundColor: colors.surfaceVariant,
-                  borderColor: colors.outlineVariant,
-                },
-              ]}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              onSubmitEditing={handleSearch}
-              placeholder="Enter skill name (e.g. React Native, TypeScript, Python)"
-              placeholderTextColor={colors.onSurfaceVariant}
-              returnKeyType="search"
-            />
-            <TouchableOpacity
-              style={[styles.searchButton, { backgroundColor: colors.primary }]}
-              onPress={handleSearch}
-            >
-              <Text style={[styles.searchButtonText, { color: colors.onPrimary }]}>
-                Search
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Popular Skill Quick-Picks */}
-          <View style={{ marginTop: spacing.sm }}>
-            <Text
-              style={[
-                styles.quickPickLabel,
-                { color: colors.onSurfaceVariant, marginBottom: 6 },
-              ]}
-            >
-              Popular Skills:
-            </Text>
-            <View style={styles.chipRow}>
-              {POPULAR_SKILLS.map((skill) => {
-                const isSelected =
-                  activeTarget.toLowerCase() === skill.toLowerCase() ||
-                  searchQuery.toLowerCase() === skill.toLowerCase();
-                return (
-                  <Chip
-                    key={skill}
-                    label={`#${skill}`}
-                    selected={isSelected}
-                    variant={isSelected ? 'primary' : 'secondary'}
-                    onPress={() => handleSelectSkill(skill)}
-                    style={{ marginRight: 6, marginBottom: 6 }}
-                  />
-                );
-              })}
-            </View>
-          </View>
-        </Card>
-
-        {/* Content Wrapper handling Loading / Populated / Empty / Error */}
-        <StateWrapper
-          state={screenState}
-          emptyTitle="No Candidates Found"
-          emptySubtitle={`We couldn't find candidates matching "${activeTarget}". Try searching for another skill like React Native, Python, or TypeScript.`}
-          emptyActionLabel="Refresh Candidates"
-          onEmptyAction={() => loadRecommendations(activeTarget)}
-          errorMessage={
-            errorCode === 'FORBIDDEN'
-              ? 'Only the project owner can view recommendations for this project. Search by skill instead.'
-              : errorMessage
-          }
-          errorCode={errorCode}
-          onRetry={() => {
-            if (errorCode === 'FORBIDDEN') {
-              handleSelectSkill('React Native');
-            } else {
-              loadRecommendations(activeTarget);
-            }
-          }}
-        >
-          <View style={{ marginTop: spacing.md }}>
-            <View style={styles.sectionHeaderRow}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={{ paddingBottom: 90 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        <View style={{ padding: spacing.md, paddingTop: topPadding + spacing.sm }}>
+          {/* Top Header & Project Selector */}
+          <Card style={styles.headerCard}>
+            <View style={styles.titleRow}>
               <Text
                 style={[
-                  styles.sectionHeader,
-                  { color: colors.onSurface, fontSize: typography.titleMedium.fontSize },
+                  styles.title,
+                  { color: colors.onSurface, fontSize: typography.headlineMedium.fontSize },
                 ]}
               >
-                Recommended ({candidates.length})
+                Matching
               </Text>
+              <Badge
+                label={selectedProject ? selectedProject.title : 'Project Matching'}
+                variant="primary"
+              />
             </View>
 
-            {candidates.map((candidate, index) => {
+            {/* Project Selector Row */}
+            <View style={{ marginTop: spacing.sm }}>
+              <Text
+                style={[
+                  styles.subtitle,
+                  { color: colors.onSurfaceVariant, marginBottom: 6 },
+                ]}
+              >
+                Find teammates for:
+              </Text>
+
+              {/* Project Dropdown Button */}
+              <TouchableOpacity
+                style={[
+                  styles.projectDropdownCard,
+                  {
+                    backgroundColor: colors.surfaceVariant,
+                    borderColor: selectedProject ? colors.primary : colors.outlineVariant,
+                  },
+                ]}
+                onPress={() => setIsProjectPickerOpen(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Select Project"
+              >
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <View style={styles.projectDropdownHeader}>
+                    <Text style={{ fontSize: 18, marginRight: 8 }}>📁</Text>
+                    <Text
+                      style={[
+                        styles.projectDropdownTitle,
+                        { color: colors.onSurface },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {selectedProject
+                        ? selectedProject.title
+                        : activeTarget.startsWith('project-')
+                        ? `Project (${activeTarget})`
+                        : activeTarget}
+                    </Text>
+                    {selectedProject && (
+                      <Badge label="Leader" variant="primary" style={{ marginLeft: 8 }} />
+                    )}
+                  </View>
+
+                  <Text
+                    style={[
+                      styles.projectDropdownSubtitle,
+                      { color: colors.onSurfaceVariant, marginTop: 4 },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {selectedProject
+                      ? `${selectedProject.domain} • ${selectedProject._count?.members || selectedProject.members?.length || 1}/${selectedProject.maxMembers || 4} members • Tap to switch`
+                      : leadingProjects.length > 0
+                      ? `${leadingProjects.length} project${leadingProjects.length > 1 ? 's' : ''} led by you • Tap to choose project`
+                      : 'Tap to choose project'}
+                  </Text>
+                </View>
+
+                <View
+                  style={[
+                    styles.dropdownChevronCircle,
+                    { backgroundColor: colors.surface },
+                  ]}
+                >
+                  <Text style={{ color: colors.onSurfaceVariant, fontSize: 12, fontWeight: '700' }}>
+                    ▼
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {leadingProjects.length === 0 && !loadingProjects && (
+                <View
+                  style={[
+                    styles.noProjectsNotice,
+                    { backgroundColor: colors.surfaceVariant, borderColor: colors.outlineVariant },
+                  ]}
+                >
+                  <Text style={[styles.noProjectsNoticeText, { color: colors.onSurfaceVariant }]}>
+                    💡 You haven't created a project yet. To invite members as a project leader, create a project first.
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => navigation?.navigate('CreateProject')}
+                    style={{ marginTop: 6 }}
+                  >
+                    <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>
+                      + Create Project Now →
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+
+            {/* Skill Filter Tabs for multi-skill sorting & navigation */}
+            <View style={{ marginTop: spacing.md }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 8,
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text
+                    style={[
+                      styles.skillTabsHeader,
+                      { color: colors.onSurfaceVariant },
+                    ]}
+                  >
+                    Filter by Skills:
+                  </Text>
+                  {selectedSkills.length > 0 && (
+                    <Badge
+                      label={`${selectedSkills.length} selected`}
+                      variant="primary"
+                      style={{ marginLeft: 8 }}
+                    />
+                  )}
+                </View>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  {selectedSkills.length > 1 && (
+                    <View
+                      style={[
+                        styles.matchModeContainer,
+                        { backgroundColor: colors.surfaceVariant, borderColor: colors.outlineVariant },
+                      ]}
+                    >
+                      <TouchableOpacity
+                        onPress={() => setMatchMode('any')}
+                        style={[
+                          styles.matchModeBtn,
+                          matchMode === 'any' && { backgroundColor: colors.primary },
+                        ]}
+                        accessibilityRole="button"
+                        accessibilityLabel="Match Any selected skill"
+                      >
+                        <Text
+                          style={[
+                            styles.matchModeText,
+                            {
+                              color: matchMode === 'any' ? colors.onPrimary : colors.onSurfaceVariant,
+                              fontWeight: matchMode === 'any' ? '700' : '500',
+                            },
+                          ]}
+                        >
+                          Any
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => setMatchMode('all')}
+                        style={[
+                          styles.matchModeBtn,
+                          matchMode === 'all' && { backgroundColor: colors.primary },
+                        ]}
+                        accessibilityRole="button"
+                        accessibilityLabel="Require All selected skills"
+                      >
+                        <Text
+                          style={[
+                            styles.matchModeText,
+                            {
+                              color: matchMode === 'all' ? colors.onPrimary : colors.onSurfaceVariant,
+                              fontWeight: matchMode === 'all' ? '700' : '500',
+                            },
+                          ]}
+                        >
+                          All
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {selectedSkills.length > 0 && (
+                    <TouchableOpacity
+                      onPress={() => setSelectedSkills([])}
+                      accessibilityRole="button"
+                      accessibilityLabel="Clear skill filters"
+                      style={{ marginLeft: 8 }}
+                    >
+                      <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '600' }}>
+                        Clear ({selectedSkills.length})
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.skillTabsContent}
+              >
+                {availableSkills.map((skill) => {
+                  const isAll = skill === 'All';
+                  const isSelected = isAll
+                    ? selectedSkills.length === 0
+                    : selectedSkills.some((s) => s.toLowerCase() === skill.toLowerCase());
+                  const count = getCandidateCountForSkill(skill);
+
+                  return (
+                    <TouchableOpacity
+                      key={skill}
+                      onPress={() => handleToggleSkill(skill)}
+                      accessibilityRole="tab"
+                      accessibilityLabel={`Filter by skill ${skill}`}
+                      style={[
+                        styles.skillTabButton,
+                        {
+                          backgroundColor: isSelected ? colors.primary : colors.surfaceVariant,
+                          borderColor: isSelected ? colors.primary : colors.outlineVariant,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.skillTabButtonText,
+                          {
+                            color: isSelected ? colors.onPrimary : colors.onSurface,
+                            fontWeight: isSelected ? '700' : '500',
+                          },
+                        ]}
+                      >
+                        {!isAll && isSelected ? '✓ ' : ''}
+                        {isAll ? 'All Skills' : skill}
+                      </Text>
+                      <View
+                        style={[
+                          styles.skillTabBadge,
+                          {
+                            backgroundColor: isSelected
+                              ? 'rgba(255, 255, 255, 0.25)'
+                              : colors.outlineVariant,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            fontWeight: '700',
+                            color: isSelected ? colors.onPrimary : colors.onSurfaceVariant,
+                          }}
+                        >
+                          {count}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          </Card>
+
+          {/* Content Wrapper handling Loading / Populated / Empty / Error */}
+          <StateWrapper
+            state={screenState}
+            emptyTitle="No Candidates Found"
+            emptySubtitle="We couldn't find matching candidates for this project yet. Try updating your project's required skills or inviting members directly."
+            emptyActionLabel="Refresh Candidates"
+            onEmptyAction={() => loadRecommendations(activeTarget)}
+            errorMessage={errorMessage}
+            errorCode={errorCode}
+            onRetry={() => {
+              if (errorCode === 'FORBIDDEN') {
+                setIsProjectPickerOpen(true);
+              } else {
+                loadRecommendations(activeTarget);
+              }
+            }}
+          >
+            <View style={{ marginTop: spacing.md }}>
+              <View style={styles.sectionHeaderRow}>
+                <Text
+                  style={[
+                    styles.sectionHeader,
+                    { color: colors.onSurface, fontSize: typography.titleMedium.fontSize },
+                  ]}
+                >
+                  Recommended ({filteredCandidates.length}
+                  {selectedSkills.length > 0
+                    ? ` • ${selectedSkills.length} skill${selectedSkills.length > 1 ? 's' : ''} filtered (${matchMode === 'all' ? 'All' : 'Any'})`
+                    : ''})
+                </Text>
+              </View>
+
+              {filteredCandidates.length === 0 ? (
+                <Card style={[styles.emptySkillFilterCard, { backgroundColor: colors.surfaceVariant }]}>
+                  <Text style={[styles.emptySkillFilterTitle, { color: colors.onSurface }]}>
+                    No candidates found matching {matchMode === 'all' ? 'all' : 'any'} of the selected skills
+                  </Text>
+                  <Text style={[styles.emptySkillFilterSubtitle, { color: colors.onSurfaceVariant, marginTop: 4 }]}>
+                    Selected skills: {selectedSkills.join(', ')}
+                  </Text>
+                  {matchMode === 'all' && (
+                    <TouchableOpacity
+                      style={[styles.resetSkillButton, { backgroundColor: colors.primary, marginTop: spacing.md }]}
+                      onPress={() => setMatchMode('any')}
+                      accessibilityRole="button"
+                      accessibilityLabel="Switch to Match Any"
+                    >
+                      <Text style={{ color: colors.onPrimary, fontWeight: '700' }}>
+                        Try "Match Any" Filter
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    style={[
+                      styles.resetSkillButton,
+                      {
+                        backgroundColor: matchMode === 'all' ? colors.surface : colors.primary,
+                        borderColor: colors.outlineVariant,
+                        borderWidth: matchMode === 'all' ? 1 : 0,
+                        marginTop: spacing.sm,
+                      },
+                    ]}
+                    onPress={() => setSelectedSkills([])}
+                    accessibilityRole="button"
+                    accessibilityLabel="Show all candidates"
+                  >
+                    <Text
+                      style={{
+                        color: matchMode === 'all' ? colors.onSurface : colors.onPrimary,
+                        fontWeight: '700',
+                      }}
+                    >
+                      Show All Candidates ({candidates.length})
+                    </Text>
+                  </TouchableOpacity>
+                </Card>
+              ) : (
+                filteredCandidates.map((candidate, index) => {
               const targetUserId = candidate.userId || candidate.id;
               const status: InvitationStatus = inviteStatuses[targetUserId] || 'idle';
               const inviteErr = inviteErrors[targetUserId];
@@ -473,11 +801,10 @@ export const MatchingScreen: React.FC<{ navigation?: any }> = ({ navigation: pro
                       style={styles.candidateHeader}
                       onPress={() => {
                         if (navigation) {
-                          const inviteProjectId = activeTarget.startsWith('project-') ? activeTarget : 'project-1';
                           navigation.navigate('UserProfile', {
                             userId: targetUserId,
                             userName: candidate.fullName,
-                            projectId: inviteProjectId,
+                            projectId: getInviteProjectId(),
                             invited: status === 'invited',
                           });
                         }
@@ -546,24 +873,36 @@ export const MatchingScreen: React.FC<{ navigation?: any }> = ({ navigation: pro
                   {/* Shared skills */}
                   {skillsList.length > 0 && (
                     <View style={{ marginTop: spacing.sm }}>
-                      <Text
-                        style={[
-                          styles.breakdownHeader,
-                          { color: colors.onSurfaceVariant },
-                        ]}
-                      >
-                        Shared skills
-                      </Text>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text
+                          style={[
+                            styles.breakdownHeader,
+                            { color: colors.onSurfaceVariant },
+                          ]}
+                        >
+                          Shared skills
+                        </Text>
+                        {selectedSkills.length > 0 && (
+                          <Text style={{ fontSize: 11, color: colors.primary, fontWeight: '600' }}>
+                            {getCandidateMatchedSkillsCount(candidate, selectedSkills)}/{selectedSkills.length} selected matched
+                          </Text>
+                        )}
+                      </View>
                       <View style={[styles.chipRow, { marginTop: 4 }]}>
-                        {skillsList.map((skill) => (
-                          <Chip
-                            key={skill}
-                            label={skill}
-                            selected
-                            variant="primary"
-                            style={{ marginRight: 6, marginBottom: 4 }}
-                          />
-                        ))}
+                        {skillsList.map((skill) => {
+                          const isSkillSelected = selectedSkills.some(
+                            (s) => s.toLowerCase() === skill.toLowerCase()
+                          );
+                          return (
+                            <Chip
+                              key={skill}
+                              label={isSkillSelected ? `✓ ${skill}` : skill}
+                              selected={isSkillSelected}
+                              variant={isSkillSelected ? 'primary' : 'secondary'}
+                              style={{ marginRight: 6, marginBottom: 4 }}
+                            />
+                          );
+                        })}
                       </View>
                     </View>
                   )}
@@ -658,32 +997,171 @@ export const MatchingScreen: React.FC<{ navigation?: any }> = ({ navigation: pro
                         disabled={status === 'inviting'}
                       />
                     )}
-
-                    <Button
-                      title="View Profile"
-                      variant="outline"
-                      onPress={() => {
-                        if (navigation) {
-                          const inviteProjectId = activeTarget.startsWith('project-') ? activeTarget : 'project-1';
-                          navigation.navigate('UserProfile', {
-                            userId: targetUserId,
-                            userName: candidate.fullName,
-                            projectId: inviteProjectId,
-                            invited: status === 'invited',
-                          });
-                        }
-                      }}
-                      style={{ marginTop: 8 }}
-                    />
                   </View>
                 </Card>
               );
-            })}
+            })
+          )}
           </View>
         </StateWrapper>
       </View>
     </ScrollView>
-  );
+
+    {/* Project Selector Modal Sheet */}
+    <Modal
+      visible={isProjectPickerOpen}
+      transparent
+      animationType="slide"
+      onRequestClose={() => setIsProjectPickerOpen(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View
+          style={[
+            styles.modalSheet,
+            {
+              backgroundColor: colors.surface,
+              padding: spacing.lg,
+            },
+          ]}
+        >
+          <View style={styles.sheetHandle} />
+
+          <View style={styles.modalHeaderRow}>
+            <Text
+              style={[
+                styles.modalTitle,
+                { color: colors.onSurface, fontSize: typography.headlineMedium.fontSize },
+              ]}
+            >
+              Choose Project
+            </Text>
+            <TouchableOpacity
+              onPress={() => setIsProjectPickerOpen(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Close project picker"
+            >
+              <Text style={{ fontSize: 20, color: colors.onSurfaceVariant, fontWeight: '600' }}>
+                ✕
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text
+            style={[
+              styles.modalSubtitle,
+              { color: colors.onSurfaceVariant, marginTop: 4, marginBottom: spacing.md },
+            ]}
+          >
+            Select a project you lead to get matched candidates and recruit teammates:
+          </Text>
+
+          <ScrollView style={{ maxHeight: 320 }} showsVerticalScrollIndicator={false}>
+            {leadingProjects.map((proj) => {
+              const isSelected = selectedProject?.id === proj.id;
+              const memberCount = proj._count?.members ?? (proj.members?.length || 1);
+              return (
+                <TouchableOpacity
+                  key={proj.id}
+                  style={[
+                    styles.modalProjectCard,
+                    {
+                      backgroundColor: isSelected ? colors.primaryContainer : colors.surfaceVariant,
+                      borderColor: isSelected ? colors.primary : colors.outlineVariant,
+                    },
+                  ]}
+                  onPress={() => handleSelectProject(proj)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Select ${proj.title}`}
+                >
+                  <View style={{ flex: 1, marginRight: 8 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text
+                        style={[
+                          styles.modalProjectCardTitle,
+                          {
+                            color: isSelected ? colors.onPrimaryContainer : colors.onSurface,
+                            fontWeight: isSelected ? '700' : '600',
+                          },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {proj.title}
+                      </Text>
+                      {isSelected && (
+                        <Badge label="Selected" variant="primary" style={{ marginLeft: 8 }} />
+                      )}
+                    </View>
+                    <Text
+                      style={[
+                        styles.modalProjectCardMeta,
+                        { color: isSelected ? colors.onPrimaryContainer : colors.onSurfaceVariant },
+                      ]}
+                    >
+                      {proj.domain} • {memberCount}/{proj.maxMembers || 4} members
+                    </Text>
+                  </View>
+
+                  <Text
+                    style={{
+                      fontSize: 18,
+                      fontWeight: '700',
+                      color: isSelected ? colors.primary : colors.outlineVariant,
+                    }}
+                  >
+                    {isSelected ? '✓' : '○'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+
+            {leadingProjects.length === 0 && (
+              <View style={{ padding: spacing.lg, alignItems: 'center' }}>
+                <Text style={{ fontSize: 32, marginBottom: 8 }}>📁</Text>
+                <Text style={[styles.emptyModalTitle, { color: colors.onSurface }]}>
+                  No Leading Projects Found
+                </Text>
+                <Text
+                  style={[
+                    styles.emptyModalSubtitle,
+                    { color: colors.onSurfaceVariant, textAlign: 'center', marginTop: 4 },
+                  ]}
+                >
+                  You are not currently the leader of any project. Create a project to start recruiting teammates.
+                </Text>
+              </View>
+            )}
+          </ScrollView>
+
+          {/* Modal Bottom Actions */}
+          <View
+            style={[
+              styles.modalActionsBox,
+              { borderTopColor: colors.outlineVariant, marginTop: spacing.md, paddingTop: spacing.md },
+            ]}
+          >
+            <TouchableOpacity
+              style={[
+                styles.modalActionButton,
+                { backgroundColor: colors.primary },
+              ]}
+              onPress={() => {
+                setIsProjectPickerOpen(false);
+                navigation?.navigate('CreateProject');
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Create New Project"
+            >
+              <Text style={{ fontSize: 16, marginRight: 8 }}>➕</Text>
+              <Text style={[styles.modalActionText, { color: colors.onPrimary, fontWeight: '700' }]}>
+                + Create New Project
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  </View>
+);
 };
 
 const styles = StyleSheet.create({
@@ -849,5 +1327,179 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     fontSize: 12,
     fontWeight: '600',
+  },
+  projectDropdownCard: {
+    padding: 14,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  projectDropdownHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  projectDropdownTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    flexShrink: 1,
+  },
+  projectDropdownSubtitle: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  dropdownChevronCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+  noProjectsNotice: {
+    marginTop: 8,
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  noProjectsNoticeText: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    maxHeight: '85%',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  sheetHandle: {
+    width: 44,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#94A3B8',
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontWeight: '700',
+    fontSize: 20,
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  modalProjectCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 14,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    marginBottom: 10,
+  },
+  modalProjectCardTitle: {
+    fontSize: 15,
+    flexShrink: 1,
+  },
+  modalProjectCardMeta: {
+    fontSize: 12,
+    marginTop: 3,
+  },
+  emptyModalTitle: {
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  emptyModalSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  modalActionsBox: {
+    borderTopWidth: 1,
+    paddingTop: 12,
+  },
+  modalActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  modalActionText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  skillTabsHeader: {
+    fontSize: 13,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  skillTabsContent: {
+    paddingVertical: 4,
+    gap: 8,
+  },
+  skillTabButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    marginRight: 8,
+  },
+  skillTabButtonText: {
+    fontSize: 13,
+  },
+  skillTabBadge: {
+    marginLeft: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  emptySkillFilterCard: {
+    padding: 20,
+    alignItems: 'center',
+    borderRadius: 12,
+    marginTop: 16,
+  },
+  emptySkillFilterTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  emptySkillFilterSubtitle: {
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  resetSkillButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  matchModeContainer: {
+    flexDirection: 'row',
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  matchModeBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  matchModeText: {
+    fontSize: 11,
   },
 });

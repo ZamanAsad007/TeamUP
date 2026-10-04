@@ -171,6 +171,15 @@ describe('Phase 2 — Team Workspace Shell', () => {
       expect(getByText(/Applicant User/)).toBeTruthy();
       expect(getByText('Accept')).toBeTruthy();
       expect(getByText('Reject')).toBeTruthy();
+      expect(getByText('View Profile')).toBeTruthy();
+    });
+
+    const viewProfileBtn = getByText('View Profile');
+    fireEvent.press(viewProfileBtn);
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('UserProfile', {
+      userId: 'user-applicant',
+      userName: 'Applicant User',
+      projectId: 'proj-1',
     });
 
     const acceptBtn = getByText('Accept');

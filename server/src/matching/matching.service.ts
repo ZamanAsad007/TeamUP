@@ -96,9 +96,7 @@ export class MatchingService {
     if (
       requesterUserId &&
       targetProject.creatorId &&
-      targetProject.creatorId !== requesterUserId &&
-      targetProject.status &&
-      targetProject.status !== 'OPEN'
+      targetProject.creatorId !== requesterUserId
     ) {
       const isLeader = targetProject.members?.some(
         (m: any) =>

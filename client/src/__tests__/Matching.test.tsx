@@ -68,7 +68,7 @@ describe('Skill-Based Matching (Phase 3 - Feature 2)', () => {
 
     // Check matching skills
     expect(getAllByText('React Native').length).toBeGreaterThan(0);
-    expect(getByText('TypeScript')).toBeTruthy();
+    expect(getAllByText('TypeScript').length).toBeGreaterThan(0);
   });
 
   it('handles optimistic invite action and transitions to Invited state', async () => {
@@ -153,4 +153,129 @@ describe('Skill-Based Matching (Phase 3 - Feature 2)', () => {
       await findByText(/Failed to fetch recommendations from server/i)
     ).toBeTruthy();
   });
+
+  it('handles route.params.projectId with custom UUID and sends invites to that project', async () => {
+    (api.get as jest.Mock).mockResolvedValueOnce(mockCandidates);
+    (api.post as jest.Mock).mockResolvedValueOnce({ success: true });
+
+    const mockRoute = {
+      params: {
+        projectId: '6e8f4c12-3456-7890-abcd-ef1234567890',
+        projectTitle: 'Smart IoT Irrigation',
+      },
+    };
+
+    const { findByText, getAllByText } = render(
+      <ThemeProvider>
+        <MatchingScreen route={mockRoute} />
+      </ThemeProvider>
+    );
+
+    // Verify recommendations called with custom UUID
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith(
+        '/projects/6e8f4c12-3456-7890-abcd-ef1234567890/recommendations'
+      );
+    });
+
+    expect(await findByText('Alice Johnson')).toBeTruthy();
+
+    const inviteButtons = getAllByText('Invite to Team');
+    fireEvent.press(inviteButtons[0]);
+
+    // Verify invite payload uses the custom UUID, NOT project-1
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith(
+        '/projects/6e8f4c12-3456-7890-abcd-ef1234567890/invite',
+        {
+          userId: 'user-1',
+          role: 'MEMBER',
+        }
+      );
+    });
+  });
+
+  it('opens project picker modal when dropdown selector is pressed', async () => {
+    (api.get as jest.Mock).mockResolvedValueOnce(mockCandidates);
+
+    const { getByLabelText, findByText } = render(
+      <ThemeProvider>
+        <MatchingScreen />
+      </ThemeProvider>
+    );
+
+    const dropdown = getByLabelText('Select Project');
+    fireEvent.press(dropdown);
+
+    expect(await findByText('Choose Project')).toBeTruthy();
+    expect(await findByText('+ Create New Project')).toBeTruthy();
+  });
+
+  it('filters candidates when a skill tab is pressed', async () => {
+    (api.get as jest.Mock).mockResolvedValueOnce(mockCandidates);
+
+    const { findByText, getByText, queryByText, getByLabelText } = render(
+      <ThemeProvider>
+        <MatchingScreen />
+      </ThemeProvider>
+    );
+
+    // Initial render shows both candidates
+    expect(await findByText('Alice Johnson')).toBeTruthy();
+    expect(getByText('Bob Smith')).toBeTruthy();
+
+    // Alice has TypeScript, Bob does not. Press TypeScript tab.
+    const tsTab = getByLabelText('Filter by skill TypeScript');
+    fireEvent.press(tsTab);
+
+    // Alice Johnson should remain, Bob Smith should be filtered out
+    expect(getByText('Alice Johnson')).toBeTruthy();
+    expect(queryByText('Bob Smith')).toBeNull();
+
+    // Reset filter to All Skills
+    const allTab = getByLabelText('Filter by skill All');
+    fireEvent.press(allTab);
+
+    // Both should be visible again
+    expect(getByText('Alice Johnson')).toBeTruthy();
+    expect(getByText('Bob Smith')).toBeTruthy();
+  });
+
+  it('enables multiple skill selection in filter and handles match mode', async () => {
+    (api.get as jest.Mock).mockResolvedValueOnce(mockCandidates);
+
+    const { findByText, getByText, queryByText, getByLabelText } = render(
+      <ThemeProvider>
+        <MatchingScreen />
+      </ThemeProvider>
+    );
+
+    expect(await findByText('Alice Johnson')).toBeTruthy();
+    expect(getByText('Bob Smith')).toBeTruthy();
+
+    // Select TypeScript (Alice has it, Bob does not)
+    fireEvent.press(getByLabelText('Filter by skill TypeScript'));
+    expect(getByText('Alice Johnson')).toBeTruthy();
+    expect(queryByText('Bob Smith')).toBeNull();
+
+    // Select Figma as well (Bob has it, Alice does not)
+    fireEvent.press(getByLabelText('Filter by skill Figma'));
+
+    // In default 'any' mode: both Alice (has TypeScript) and Bob (has Figma) are visible
+    expect(getByText('Alice Johnson')).toBeTruthy();
+    expect(getByText('Bob Smith')).toBeTruthy();
+    expect(getByText('2 selected')).toBeTruthy();
+
+    // Switch to 'all' mode: neither has BOTH TypeScript and Figma
+    fireEvent.press(getByLabelText('Require All selected skills'));
+    expect(queryByText('Alice Johnson')).toBeNull();
+    expect(queryByText('Bob Smith')).toBeNull();
+    expect(getByText(/No candidates found matching all of the selected skills/i)).toBeTruthy();
+
+    // Clear filters
+    fireEvent.press(getByLabelText('Clear skill filters'));
+    expect(getByText('Alice Johnson')).toBeTruthy();
+    expect(getByText('Bob Smith')).toBeTruthy();
+  });
 });
+
