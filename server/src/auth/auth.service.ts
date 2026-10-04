@@ -3,6 +3,7 @@ import {
   UnauthorizedException,
   ConflictException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -18,6 +19,8 @@ import * as nodemailer from 'nodemailer';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
@@ -55,8 +58,10 @@ export class AuthService {
           'User-Agent': 'TeamUp-Backend/1.0',
         },
         body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(15000),
       });
     } catch (err: unknown) {
+      this.logger.error('Failed to communicate with GitHub OAuth token endpoint', err);
       throw new BadRequestException(
         'Unable to communicate with GitHub OAuth service',
       );
@@ -81,8 +86,10 @@ export class AuthService {
           'User-Agent': 'TeamUp-Backend/1.0',
           Accept: 'application/vnd.github.v3+json',
         },
+        signal: AbortSignal.timeout(15000),
       });
     } catch (err: unknown) {
+      this.logger.error('Failed to retrieve GitHub user details', err);
       throw new BadRequestException('Unable to fetch GitHub user details');
     }
 

@@ -1,9 +1,21 @@
+import * as net from 'node:net';
+import * as dns from 'node:dns';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
+
+// Prioritize IPv4 and disable Happy Eyeballs autoSelectFamily
+// to prevent ETIMEDOUT when external APIs (e.g. GitHub OAuth) are called
+// on systems with DNS64 or non-routable IPv6 addresses.
+if (typeof net.setDefaultAutoSelectFamily === 'function') {
+  net.setDefaultAutoSelectFamily(false);
+}
+if (typeof dns.setDefaultResultOrder === 'function') {
+  dns.setDefaultResultOrder('ipv4first');
+}
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');

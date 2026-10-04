@@ -2,7 +2,18 @@ import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
 const STORAGE_KEY = 'teamup_server_api_url';
-export const DEFAULT_API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5001/api/v1';
+
+export function getDefaultApiUrl(): string {
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location) {
+    const hostname = window.location.hostname;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return 'http://localhost:5001/api/v1';
+    }
+  }
+  return process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5001/api/v1';
+}
+
+export const DEFAULT_API_URL = getDefaultApiUrl();
 
 // In-memory fallback
 const memoryStore: Record<string, string> = {};
@@ -73,7 +84,7 @@ export function sanitizeApiUrl(rawUrl: string): string {
   cleaned = cleaned.replace(/\/+$/, '');
   
   if (!cleaned) {
-    return DEFAULT_API_URL;
+    return getDefaultApiUrl();
   }
 
   // Prepend https:// if protocol is missing
@@ -101,12 +112,22 @@ export const apiConfig = {
     try {
       const stored = await getItem(STORAGE_KEY);
       if (stored) {
-        cachedUrl = sanitizeApiUrl(stored);
+        // If on web localhost, and stored URL points to a stale LAN IP, fallback to localhost
+        if (
+          Platform.OS === 'web' &&
+          typeof window !== 'undefined' &&
+          (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') &&
+          (/^http:\/\/192\.168\./i.test(stored) || /^http:\/\/10\./i.test(stored))
+        ) {
+          cachedUrl = 'http://localhost:5001/api/v1';
+        } else {
+          cachedUrl = sanitizeApiUrl(stored);
+        }
       } else {
-        cachedUrl = DEFAULT_API_URL;
+        cachedUrl = getDefaultApiUrl();
       }
     } catch {
-      cachedUrl = DEFAULT_API_URL;
+      cachedUrl = getDefaultApiUrl();
     }
     initialized = true;
     return cachedUrl;
@@ -122,9 +143,10 @@ export const apiConfig = {
 
   async resetApiUrl(): Promise<string> {
     await deleteItem(STORAGE_KEY);
-    cachedUrl = DEFAULT_API_URL;
-    notifyListeners(DEFAULT_API_URL);
-    return DEFAULT_API_URL;
+    const defUrl = getDefaultApiUrl();
+    cachedUrl = defUrl;
+    notifyListeners(defUrl);
+    return defUrl;
   },
 
   subscribe(listener: (url: string) => void): () => void {

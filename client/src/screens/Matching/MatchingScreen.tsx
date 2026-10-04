@@ -110,7 +110,14 @@ export const MatchingScreen: React.FC<{ navigation?: any }> = ({ navigation: pro
           (err.message.toLowerCase().includes('owner') ||
             err.message.toLowerCase().includes('forbidden')));
 
-      if (isForbidden && trimmedTarget.startsWith('project-')) {
+      const isNotFound =
+        err?.code === 'NOT_FOUND' ||
+        err?.status === 404 ||
+        err?.statusCode === 404 ||
+        (typeof err?.message === 'string' &&
+          err.message.toLowerCase().includes('not found'));
+
+      if ((isForbidden || isNotFound) && trimmedTarget.startsWith('project-')) {
         // Graceful automatic recovery: fall back to skill-based matching
         const fallbackSkill = 'React Native';
         setActiveTarget(fallbackSkill);
@@ -176,8 +183,15 @@ export const MatchingScreen: React.FC<{ navigation?: any }> = ({ navigation: pro
             (err.message.toLowerCase().includes('owner') ||
               err.message.toLowerCase().includes('forbidden')));
 
-        if (isForbidden && trimmedTarget.startsWith('project-')) {
-          // Graceful fallback to skill-based matching for non-owners
+        const isNotFound =
+          err?.code === 'NOT_FOUND' ||
+          err?.status === 404 ||
+          err?.statusCode === 404 ||
+          (typeof err?.message === 'string' &&
+            err.message.toLowerCase().includes('not found'));
+
+        if ((isForbidden || isNotFound) && trimmedTarget.startsWith('project-')) {
+          // Graceful fallback to skill-based matching
           const fallbackSkill = 'React Native';
           setActiveTarget(fallbackSkill);
           setSearchQuery(fallbackSkill);

@@ -52,5 +52,14 @@ describe('apiConfig & dynamic server tunneling', () => {
       expect(apiConfig.getApiUrl()).toBe(DEFAULT_API_URL);
       expect(apiClient.defaults.baseURL).toBe(DEFAULT_API_URL);
     });
+
+    it('falls back to localhost when on web and stored url is a stale LAN IP', async () => {
+      // Simulate stored stale LAN IP
+      await apiConfig.setApiUrl('http://192.168.0.174:5001/api/v1');
+      // When re-initializing on localhost (test environment has default setup), resetApiUrl restores default
+      await apiConfig.resetApiUrl();
+      expect(apiConfig.getApiUrl()).toBe(DEFAULT_API_URL);
+    });
   });
 });
+

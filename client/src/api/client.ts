@@ -29,7 +29,7 @@ export const apiClient: AxiosInstance = axios.create({
     'Content-Type': 'application/json',
     'ngrok-skip-browser-warning': 'true',
   },
-  timeout: 10000,
+  timeout: 20000,
 });
 
 // Sync baseURL if changed at runtime

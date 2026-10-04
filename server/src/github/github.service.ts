@@ -94,6 +94,7 @@ export class GithubService {
           'User-Agent': 'TeamUp-Backend/1.0',
         },
         body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(15000),
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -122,6 +123,7 @@ export class GithubService {
           'User-Agent': 'TeamUp-Backend/1.0',
           Accept: 'application/vnd.github.v3+json',
         },
+        signal: AbortSignal.timeout(15000),
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -218,6 +220,7 @@ export class GithubService {
             'User-Agent': 'TeamUp-Backend/1.0',
             Accept: 'application/vnd.github.v3+json',
           },
+          signal: AbortSignal.timeout(15000),
         }),
         fetch(
           `https://api.github.com/users/${encodeURIComponent(username)}/repos?sort=updated&per_page=30`,
@@ -226,6 +229,7 @@ export class GithubService {
               'User-Agent': 'TeamUp-Backend/1.0',
               Accept: 'application/vnd.github.v3+json',
             },
+            signal: AbortSignal.timeout(15000),
           },
         ),
       ]);
