@@ -130,7 +130,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
     setInviteError('');
 
     try {
-      const targetProject = projectId.startsWith('project-') ? projectId : 'project-1';
+      const targetProject = projectId || 'project-1';
       await api.post(`/projects/${targetProject}/invite`, {
         targetUserId: userId,
       });

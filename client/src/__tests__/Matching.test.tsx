@@ -153,4 +153,62 @@ describe('Skill-Based Matching (Phase 3 - Feature 2)', () => {
       await findByText(/Failed to fetch recommendations from server/i)
     ).toBeTruthy();
   });
+
+  it('handles route.params.projectId with custom UUID and sends invites to that project', async () => {
+    (api.get as jest.Mock).mockResolvedValueOnce(mockCandidates);
+    (api.post as jest.Mock).mockResolvedValueOnce({ success: true });
+
+    const mockRoute = {
+      params: {
+        projectId: '6e8f4c12-3456-7890-abcd-ef1234567890',
+        projectTitle: 'Smart IoT Irrigation',
+      },
+    };
+
+    const { findByText, getAllByText } = render(
+      <ThemeProvider>
+        <MatchingScreen route={mockRoute} />
+      </ThemeProvider>
+    );
+
+    // Verify recommendations called with custom UUID
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith(
+        '/projects/6e8f4c12-3456-7890-abcd-ef1234567890/recommendations'
+      );
+    });
+
+    expect(await findByText('Alice Johnson')).toBeTruthy();
+
+    const inviteButtons = getAllByText('Invite to Team');
+    fireEvent.press(inviteButtons[0]);
+
+    // Verify invite payload uses the custom UUID, NOT project-1
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith(
+        '/projects/6e8f4c12-3456-7890-abcd-ef1234567890/invite',
+        {
+          userId: 'user-1',
+          role: 'MEMBER',
+        }
+      );
+    });
+  });
+
+  it('opens project picker modal when dropdown selector is pressed', async () => {
+    (api.get as jest.Mock).mockResolvedValueOnce(mockCandidates);
+
+    const { getByLabelText, findByText } = render(
+      <ThemeProvider>
+        <MatchingScreen />
+      </ThemeProvider>
+    );
+
+    const dropdown = getByLabelText('Select Project');
+    fireEvent.press(dropdown);
+
+    expect(await findByText('Choose Project')).toBeTruthy();
+    expect(await findByText('General Skill Search')).toBeTruthy();
+  });
 });
+

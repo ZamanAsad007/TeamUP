@@ -17,7 +17,7 @@ import { useTheme } from '../theme/ThemeContext';
 export interface ButtonProps {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'tertiary' | 'outline';
+  variant?: 'primary' | 'secondary' | 'tertiary' | 'outline' | 'ghost';
   disabled?: boolean;
   loading?: boolean;
   style?: StyleProp<ViewStyle>;
@@ -86,6 +86,7 @@ export const Button: React.FC<ButtonProps> = ({
       case 'tertiary':
         return colors.tertiaryContainer;
       case 'outline':
+      case 'ghost':
         return 'transparent';
       default:
         return colors.primary;
@@ -102,6 +103,7 @@ export const Button: React.FC<ButtonProps> = ({
       case 'tertiary':
         return colors.onTertiaryContainer;
       case 'outline':
+      case 'ghost':
         return colors.primary;
       default:
         return colors.onPrimary;

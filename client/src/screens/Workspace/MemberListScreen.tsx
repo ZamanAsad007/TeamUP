@@ -180,6 +180,17 @@ export const MemberListScreen: React.FC<MemberListScreenProps> = ({ route, navig
     }
   };
 
+  const handleViewProfile = (member: ProjectMember) => {
+    const targetUserId = member.userId || member.user?.id;
+    if (!targetUserId) return;
+    const memberName = member.user?.profile?.fullName || member.user?.email || 'Member Profile';
+    navigation?.navigate('UserProfile', {
+      userId: targetUserId,
+      userName: memberName,
+      projectId,
+    });
+  };
+
   const renderMemberCard = (item: ProjectMember) => {
     const displayName = item.user?.profile?.fullName || item.user?.email || 'Team Member';
     const email = item.user?.email || '';
@@ -187,11 +198,17 @@ export const MemberListScreen: React.FC<MemberListScreenProps> = ({ route, navig
     const isSelf =
       (currentUserId && item.userId === currentUserId) ||
       (user?.email && item.user?.email && item.user.email.toLowerCase() === user.email.toLowerCase());
+    const targetUserId = item.userId || item.user?.id;
 
     return (
       <Card key={item.id} style={[styles.memberCard, { marginBottom: spacing.sm }]}>
         <View style={styles.cardTopRow}>
-          <View
+          <TouchableOpacity
+            disabled={!targetUserId}
+            onPress={() => handleViewProfile(item)}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={`View ${displayName}'s profile`}
             style={[
               styles.memberAvatar,
               {
@@ -209,15 +226,44 @@ export const MemberListScreen: React.FC<MemberListScreenProps> = ({ route, navig
             >
               {displayName.charAt(0).toUpperCase()}
             </Text>
-          </View>
+          </TouchableOpacity>
 
           <View style={{ flex: 1, marginLeft: 12, marginRight: spacing.sm }}>
-            <Text style={[typography.h3, { color: colors.text }]}>
-              {displayName} {isSelf && '(You)'}
-            </Text>
+            <TouchableOpacity
+              disabled={!targetUserId}
+              onPress={() => handleViewProfile(item)}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={`View ${displayName}'s profile`}
+            >
+              <Text style={[typography.h3, { color: colors.text }]}>
+                {displayName} {isSelf && '(You)'}
+              </Text>
+            </TouchableOpacity>
             <Text style={[typography.bodySmall, { color: colors.textMuted, marginTop: 2 }]}>
               {email} | {department}
             </Text>
+            {targetUserId && (
+              <TouchableOpacity
+                onPress={() => handleViewProfile(item)}
+                style={{ marginTop: 4, alignSelf: 'flex-start' }}
+                accessibilityRole="link"
+                accessibilityLabel="View Profile"
+              >
+                <Text
+                  style={[
+                    typography.bodySmall,
+                    {
+                      color: colors.primary,
+                      fontWeight: '600',
+                      textDecorationLine: 'underline',
+                    },
+                  ]}
+                >
+                  View Profile →
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           <View style={styles.badgesCol}>
@@ -245,6 +291,13 @@ export const MemberListScreen: React.FC<MemberListScreenProps> = ({ route, navig
             {item.status === 'PENDING' && (
               <>
                 <Button
+                  title="View Profile"
+                  variant="outline"
+                  onPress={() => handleViewProfile(item)}
+                  size="sm"
+                  style={{ marginRight: spacing.sm }}
+                />
+                <Button
                   title="Accept"
                   variant="primary"
                   onPress={() => handleUpdateStatus(item.id, 'ACCEPTED')}
@@ -261,13 +314,22 @@ export const MemberListScreen: React.FC<MemberListScreenProps> = ({ route, navig
               </>
             )}
             {item.status === 'ACCEPTED' && (
-              <Button
-                title="Kick Member"
-                variant="outline"
-                onPress={() => handleKickMember(item.id, displayName)}
-                size="sm"
-                style={{ borderColor: colors.accent }}
-              />
+              <>
+                <Button
+                  title="View Profile"
+                  variant="outline"
+                  onPress={() => handleViewProfile(item)}
+                  size="sm"
+                  style={{ marginRight: spacing.sm }}
+                />
+                <Button
+                  title="Kick Member"
+                  variant="outline"
+                  onPress={() => handleKickMember(item.id, displayName)}
+                  size="sm"
+                  style={{ borderColor: colors.accent }}
+                />
+              </>
             )}
           </View>
         )}
@@ -418,6 +480,8 @@ const styles = StyleSheet.create({
   actionsRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   dangerCard: {
     padding: 16,
