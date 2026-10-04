@@ -57,6 +57,9 @@ const POPULAR_SKILLS = [
   'Docker',
 ];
 
+const MATCHING_PROJECT_KEY = 'teamup_matching_selected_project_id';
+const MATCHING_TARGET_KEY = 'teamup_matching_active_target';
+
 export const MatchingScreen: React.FC<{ navigation?: any; route?: any }> = ({
   navigation: propNavigation,
   route: propRoute,
@@ -84,8 +87,21 @@ export const MatchingScreen: React.FC<{ navigation?: any; route?: any }> = ({
   const [isProjectPickerOpen, setIsProjectPickerOpen] = useState<boolean>(false);
   const [loadingProjects, setLoadingProjects] = useState<boolean>(false);
 
-  const initialTarget = route?.params?.projectId || 'project-1';
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  const getInitialTarget = () => {
+    if (route?.params?.projectId) return route.params.projectId;
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const saved = window.sessionStorage?.getItem(MATCHING_TARGET_KEY);
+      if (saved) return saved;
+    }
+    return 'project-1';
+  };
+
+  const initialTarget = getInitialTarget();
+  const [searchQuery, setSearchQuery] = useState<string>(() => {
+    return initialTarget && !initialTarget.startsWith('project-') && !initialTarget.includes('-')
+      ? initialTarget
+      : '';
+  });
   const [activeTarget, setActiveTarget] = useState<string>(initialTarget);
   const [candidates, setCandidates] = useState<MatchingCandidate[]>([]);
   const [screenState, setScreenState] = useState<ScreenState>('loading');
@@ -166,6 +182,21 @@ export const MatchingScreen: React.FC<{ navigation?: any; route?: any }> = ({
     }
   }, [selectedProject?.id]);
 
+  const persistTarget = (projId: string | null, target: string) => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      try {
+        if (projId) {
+          window.sessionStorage?.setItem(MATCHING_PROJECT_KEY, projId);
+        } else {
+          window.sessionStorage?.setItem(MATCHING_PROJECT_KEY, '__SKILL_SEARCH__');
+        }
+        window.sessionStorage?.setItem(MATCHING_TARGET_KEY, target);
+      } catch {
+        // ignore storage errors
+      }
+    }
+  };
+
   const fetchUserProjects = useCallback(async () => {
     try {
       setLoadingProjects(true);
@@ -182,15 +213,26 @@ export const MatchingScreen: React.FC<{ navigation?: any; route?: any }> = ({
         });
         setLeadingProjects(leaderList);
 
+        const savedProjId =
+          Platform.OS === 'web' && typeof window !== 'undefined'
+            ? window.sessionStorage?.getItem(MATCHING_PROJECT_KEY)
+            : null;
+
         const routeProjectId = route?.params?.projectId;
-        if (routeProjectId) {
-          const match = leaderList.find((p) => p.id === routeProjectId);
+        const targetProjectId =
+          routeProjectId || (savedProjId && savedProjId !== '__SKILL_SEARCH__' ? savedProjId : null);
+
+        if (targetProjectId) {
+          const match = leaderList.find((p) => p.id === targetProjectId);
           if (match) {
             setSelectedProject(match);
             setActiveTarget(match.id);
           } else {
-            setActiveTarget(routeProjectId);
+            setActiveTarget(targetProjectId);
           }
+        } else if (savedProjId === '__SKILL_SEARCH__') {
+          // Explicit skill search mode was selected, retain it
+          setSelectedProject(null);
         } else if (!selectedProject && leaderList.length > 0) {
           setSelectedProject(leaderList[0]);
           setActiveTarget(leaderList[0].id);
@@ -232,6 +274,7 @@ export const MatchingScreen: React.FC<{ navigation?: any; route?: any }> = ({
     if (trimmed) {
       setSelectedProject(null);
       setActiveTarget(trimmed);
+      persistTarget(null, trimmed);
     }
   };
 
@@ -239,6 +282,22 @@ export const MatchingScreen: React.FC<{ navigation?: any; route?: any }> = ({
     setSearchQuery(skill);
     setSelectedProject(null);
     setActiveTarget(skill);
+    persistTarget(null, skill);
+  };
+
+  const handleSelectProject = (proj: Project) => {
+    setSelectedProject(proj);
+    setActiveTarget(proj.id);
+    setIsProjectPickerOpen(false);
+    persistTarget(proj.id, proj.id);
+  };
+
+  const handleSwitchToSkillSearch = () => {
+    setSelectedProject(null);
+    setActiveTarget('React Native');
+    setSearchQuery('React Native');
+    setIsProjectPickerOpen(false);
+    persistTarget(null, 'React Native');
   };
 
   const getInviteProjectId = useCallback((): string => {
@@ -349,11 +408,7 @@ export const MatchingScreen: React.FC<{ navigation?: any; route?: any }> = ({
                 </Text>
                 {selectedProject && (
                   <TouchableOpacity
-                    onPress={() => {
-                      setSelectedProject(null);
-                      setActiveTarget('React Native');
-                      setSearchQuery('React Native');
-                    }}
+                    onPress={handleSwitchToSkillSearch}
                     accessibilityRole="button"
                     accessibilityLabel="Switch to skill search"
                   >
@@ -846,11 +901,7 @@ export const MatchingScreen: React.FC<{ navigation?: any; route?: any }> = ({
                       borderColor: isSelected ? colors.primary : colors.outlineVariant,
                     },
                   ]}
-                  onPress={() => {
-                    setSelectedProject(proj);
-                    setActiveTarget(proj.id);
-                    setIsProjectPickerOpen(false);
-                  }}
+                  onPress={() => handleSelectProject(proj)}
                   accessibilityRole="button"
                   accessibilityLabel={`Select ${proj.title}`}
                 >
@@ -925,12 +976,7 @@ export const MatchingScreen: React.FC<{ navigation?: any; route?: any }> = ({
                 styles.modalActionButton,
                 { backgroundColor: colors.surfaceVariant, borderColor: colors.outlineVariant },
               ]}
-              onPress={() => {
-                setSelectedProject(null);
-                setActiveTarget('React Native');
-                setSearchQuery('React Native');
-                setIsProjectPickerOpen(false);
-              }}
+              onPress={handleSwitchToSkillSearch}
             >
               <Text style={{ fontSize: 16, marginRight: 8 }}>🌐</Text>
               <Text style={[styles.modalActionText, { color: colors.onSurface }]}>

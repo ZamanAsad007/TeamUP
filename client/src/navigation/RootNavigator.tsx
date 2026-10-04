@@ -1,5 +1,6 @@
-import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import React, { useState, useEffect } from 'react';
+import { Platform } from 'react-native';
+import { NavigationContainer, LinkingOptions, InitialState } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../theme/ThemeContext';
@@ -44,11 +45,120 @@ export type RootStackParamList = {
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
+const NAVIGATION_STATE_KEY = 'TEAMUP_NAVIGATION_STATE_V1';
+
+const linking: LinkingOptions<RootStackParamList> = {
+  prefixes: [
+    'teamup://',
+    'http://localhost:8081',
+    'http://localhost:5001',
+    'http://localhost:3000',
+    'https://teamup.app',
+  ],
+  filter: (url: string) => !url.includes('+expo-auth-session') && !url.includes('auth/github/callback'),
+  config: {
+    screens: {
+      Landing: 'landing',
+      Login: 'login',
+      Register: 'register',
+      VerifyEmail: 'verify-email',
+      MainApp: {
+        screens: {
+          Projects: '',
+          Matching: 'matching',
+          Create: 'create-tab',
+          IdeaHub: 'ideahub',
+          More: 'more',
+        },
+      },
+      ProjectDetail: 'projects/:projectId',
+      CreateProject: 'create-project',
+      Workspace: {
+        path: 'workspace/:projectId',
+        screens: {
+          WorkspaceHome: '',
+          Kanban: 'kanban',
+          Chat: 'chat',
+          Members: 'members',
+          Files: 'files',
+          Evaluation: 'evaluation',
+          Analytics: 'analytics',
+        },
+      } as any,
+      Search: 'search',
+      Scheduler: 'scheduler',
+      Calendar: 'calendar',
+      Notifications: 'notifications',
+      Bookmarks: 'bookmarks',
+      Profile: 'profile',
+      UserProfile: 'users/:userId',
+      Settings: 'settings',
+      MyProjects: 'my-projects',
+    },
+  },
+};
+
 export const RootNavigator = () => {
   const { isAuthenticated, isLoading } = useAuth();
   const { colors, isDark } = useTheme();
+  const [isReady, setIsReady] = useState(false);
+  const [initialState, setInitialState] = useState<InitialState | undefined>();
 
-  if (isLoading) {
+  useEffect(() => {
+    const restoreState = async () => {
+      try {
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          const saved =
+            window.sessionStorage?.getItem(NAVIGATION_STATE_KEY) ||
+            window.localStorage?.getItem(NAVIGATION_STATE_KEY);
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            if (parsed && typeof parsed === 'object') {
+              const firstRoute = parsed.routes?.[0]?.name;
+              const authRoutes = ['Landing', 'Login', 'Register', 'VerifyEmail'];
+              const isSavedStateAuthOnly = authRoutes.includes(firstRoute);
+
+              // Only restore state if authentication status matches the saved state
+              if ((isAuthenticated && !isSavedStateAuthOnly) || (!isAuthenticated && isSavedStateAuthOnly)) {
+                setInitialState(parsed);
+              }
+            }
+          }
+        }
+      } catch {
+        // Fall back to default initial route
+      } finally {
+        setIsReady(true);
+      }
+    };
+
+    restoreState();
+  }, [isAuthenticated]);
+
+  const handleStateChange = (state: any) => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && state) {
+      try {
+        const stateString = JSON.stringify(state);
+        window.sessionStorage?.setItem(NAVIGATION_STATE_KEY, stateString);
+        window.localStorage?.setItem(NAVIGATION_STATE_KEY, stateString);
+      } catch {
+        // Ignore quota or private browsing errors
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (!isAuthenticated && Platform.OS === 'web' && typeof window !== 'undefined') {
+      try {
+        window.sessionStorage?.removeItem(NAVIGATION_STATE_KEY);
+        window.localStorage?.removeItem(NAVIGATION_STATE_KEY);
+      } catch {
+        // ignore
+      }
+    }
+  }, [isAuthenticated]);
+
+  if (isLoading || !isReady) {
     return <StateWrapper state="loading" />;
   }
 
@@ -71,7 +181,12 @@ export const RootNavigator = () => {
   };
 
   return (
-    <NavigationContainer theme={themeConfig}>
+    <NavigationContainer
+      theme={themeConfig}
+      linking={linking}
+      initialState={initialState}
+      onStateChange={handleStateChange}
+    >
       <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
         {isAuthenticated ? (
           <>

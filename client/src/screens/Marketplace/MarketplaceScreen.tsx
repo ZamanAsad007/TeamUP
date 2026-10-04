@@ -33,16 +33,35 @@ export interface MarketplaceScreenProps {
 
 const DOMAIN_FILTERS = ['All', 'Web', 'Mobile', 'AI', 'Design'];
 
+const MARKETPLACE_DOMAIN_KEY = 'teamup_marketplace_domain';
+const MARKETPLACE_SEARCH_KEY = 'teamup_marketplace_search';
+
 export const MarketplaceScreen: React.FC<MarketplaceScreenProps> = ({ navigation }) => {
   const { colors, typography, spacing, borderRadius, isDark } = useTheme();
   const insets = useSafeInsets();
   const { user } = useAuth();
 
+  const getInitialDomain = () => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const saved = window.sessionStorage?.getItem(MARKETPLACE_DOMAIN_KEY);
+      if (saved && DOMAIN_FILTERS.includes(saved)) return saved;
+    }
+    return 'All';
+  };
+
+  const getInitialSearch = () => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const saved = window.sessionStorage?.getItem(MARKETPLACE_SEARCH_KEY);
+      if (saved) return saved;
+    }
+    return '';
+  };
+
   const [projects, setProjects] = useState<Project[]>([]);
   const [screenState, setScreenState] = useState<ScreenState>('loading');
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedDomain, setSelectedDomain] = useState('All');
+  const [searchQuery, setSearchQuery] = useState(getInitialSearch);
+  const [selectedDomain, setSelectedDomain] = useState(getInitialDomain);
   const [refreshing, setRefreshing] = useState(false);
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [bookmarkedProjectIds, setBookmarkedProjectIds] = useState<Set<string>>(new Set());
@@ -148,7 +167,7 @@ export const MarketplaceScreen: React.FC<MarketplaceScreenProps> = ({ navigation
   }, []);
 
   useEffect(() => {
-    fetchProjects();
+    fetchProjects(getInitialSearch(), getInitialDomain());
   }, [fetchProjects]);
 
   const onRefresh = async () => {
@@ -176,11 +195,25 @@ export const MarketplaceScreen: React.FC<MarketplaceScreenProps> = ({ navigation
   };
 
   const executeSearch = () => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      if (searchQuery.trim()) {
+        window.sessionStorage?.setItem(MARKETPLACE_SEARCH_KEY, searchQuery.trim());
+      } else {
+        window.sessionStorage?.removeItem(MARKETPLACE_SEARCH_KEY);
+      }
+    }
     setScreenState('loading');
     fetchProjects(searchQuery, selectedDomain);
   };
 
   const handleSelectDomain = (domain: string) => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      if (domain && domain !== 'All') {
+        window.sessionStorage?.setItem(MARKETPLACE_DOMAIN_KEY, domain);
+      } else {
+        window.sessionStorage?.removeItem(MARKETPLACE_DOMAIN_KEY);
+      }
+    }
     setSelectedDomain(domain);
     setScreenState('loading');
     fetchProjects(searchQuery, domain);
@@ -666,6 +699,9 @@ export const MarketplaceScreen: React.FC<MarketplaceScreenProps> = ({ navigation
               onSubmitEditing={executeSearch}
               onClear={() => {
                 setSearchQuery('');
+                if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                  window.sessionStorage?.removeItem(MARKETPLACE_SEARCH_KEY);
+                }
                 fetchProjects('', selectedDomain);
               }}
               placeholder="Search projects by title, domain, tech..."
