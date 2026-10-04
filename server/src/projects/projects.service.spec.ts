@@ -369,5 +369,59 @@ describe('ProjectsService - Search & Multi-criteria Filters', () => {
       );
     });
   });
+
+  describe('inviteMember', () => {
+    it('should throw BadRequestException if neither userId nor targetUserId is provided', async () => {
+      mockPrismaService.project.findUnique.mockResolvedValue({
+        id: 'proj-1',
+        title: 'Project 1',
+        creatorId: 'leader-1',
+      });
+
+      await expect(
+        service.inviteMember('proj-1', 'leader-1', {} as any),
+      ).rejects.toThrow('userId is required');
+    });
+
+    it('should successfully invite using targetUserId alias', async () => {
+      mockPrismaService.project.findUnique.mockResolvedValue({
+        id: 'proj-1',
+        title: 'Project 1',
+        creatorId: 'leader-1',
+        maxMembers: 5,
+        members: [{ userId: 'leader-1', role: 'LEADER', status: 'ACCEPTED' }],
+      });
+      mockPrismaService.user.findUnique.mockResolvedValue({ id: 'target-user-1' });
+      mockPrismaService.projectMember.findUnique.mockResolvedValue(null);
+      mockPrismaService.projectMember.count.mockResolvedValue(1);
+      mockPrismaService.projectMember.create.mockResolvedValue({
+        id: 'pm-1',
+        projectId: 'proj-1',
+        userId: 'target-user-1',
+        role: 'MEMBER',
+        status: 'PENDING',
+      });
+
+      const res = await service.inviteMember('proj-1', 'leader-1', {
+        targetUserId: 'target-user-1',
+      });
+
+      expect(mockPrismaService.projectMember.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          projectId: 'proj-1',
+          userId: 'target-user-1',
+          role: 'MEMBER',
+          status: 'PENDING',
+        }),
+      });
+      expect(mockNotificationsService.notifyUser).toHaveBeenCalledWith(
+        'target-user-1',
+        expect.objectContaining({
+          type: 'PROJECT_INVITE',
+        }),
+      );
+    });
+  });
 });
+
 

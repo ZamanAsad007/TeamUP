@@ -2,9 +2,13 @@ import { IsOptional, IsEnum, IsString, IsNotEmpty } from 'class-validator';
 import { MemberStatus, ProjectRole } from '@prisma/client';
 
 export class InviteMemberDto {
+  @IsOptional()
   @IsString({ message: 'userId must be a string' })
-  @IsNotEmpty({ message: 'userId is required' })
-  userId: string;
+  userId?: string;
+
+  @IsOptional()
+  @IsString({ message: 'targetUserId must be a string' })
+  targetUserId?: string;
 
   @IsOptional()
   @IsEnum(ProjectRole, { message: 'role must be LEADER or MEMBER' })
